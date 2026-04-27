@@ -268,13 +268,20 @@ export default function AdminDashboard() {
         return activity.date === today
       })
 
-      const formattedRecent = filteredRecent.map(activity => ({
-        ...activity,
-        display_name: activity.is_temporary
-          ? `${activity.student_name || 'Unregistered'} (Temporary)`
-          : activity.students ? `${activity.students.first_name} ${activity.students.last_name}` : activity.student_name,
-        display_lrn: activity.lrn || activity.students?.lrn || 'N/A'
-      }))
+      const formattedRecent = filteredRecent.map(activity => {
+        const linkedStudent = Array.isArray(activity.students)
+          ? activity.students[0]
+          : activity.students
+
+        return {
+          ...activity,
+          linkedStudent,
+          display_name: activity.is_temporary
+            ? `${activity.student_name || 'Unregistered'} (Temporary)`
+            : linkedStudent ? `${linkedStudent.first_name} ${linkedStudent.last_name}` : activity.student_name,
+          display_lrn: activity.lrn || linkedStudent?.lrn || 'N/A'
+        }
+      })
 
       setRecentActivity(formattedRecent || [])
 
@@ -583,9 +590,9 @@ export default function AdminDashboard() {
                     <div className="w-10 h-10 rounded-full bg-linear-to-br from-blue-100 to-purple-100 flex items-center justify-center">
                       {activity.is_temporary ? (
                         <UserPlus className="w-5 h-5 text-orange-600" />
-                      ) : activity.students?.profile_photo_base64 ? (
+                      ) : activity.linkedStudent?.profile_photo_base64 ? (
                         <img 
-                          src={activity.students.profile_photo_base64} 
+                          src={activity.linkedStudent.profile_photo_base64} 
                           alt={activity.display_name}
                           className="w-10 h-10 rounded-full object-cover"
                         />
