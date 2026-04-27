@@ -235,6 +235,9 @@ export default function StudentDashboard() {
     document.body.removeChild(link)
   }
 
+  // Remove the regenerate function since we only want one QR code
+  // Students should not be able to regenerate their QR code
+
   const handleEditToggle = () => {
     if (isEditing) {
       setEditedStudent(student || {})
@@ -1491,6 +1494,13 @@ export default function StudentDashboard() {
                           <Shield className="w-4 h-4 text-purple-600" />
                         </div>
                       </div>
+                      
+                      {/* Encrypted Data Preview */}
+                      <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 mb-4 w-full">
+                        <p className="text-center text-white text-xs font-mono">
+                          {student.qr_code_data.substring(0, 30)}... [ENCRYPTED]
+                        </p>
+                      </div>
 
                       <div className="flex flex-col gap-3 w-full">
                         <button
@@ -1500,6 +1510,8 @@ export default function StudentDashboard() {
                           <Download className="w-4 h-4" />
                           Download QR Code
                         </button>
+                        
+                        {/* Removed the regenerate button */}
                       </div>
                       
                       <div className="mt-6 p-4 bg-blue-800/30 backdrop-blur-sm rounded-xl border border-white/20 max-w-lg">
@@ -1628,7 +1640,7 @@ export default function StudentDashboard() {
                                   year: 'numeric' 
                                 })}
                               </span>
-                            <table>
+                            </td>
                             <td className="py-4 px-6 whitespace-nowrap">
                               <div className="flex items-center gap-2">
                                 <Clock className="w-4 h-4 text-gray-400" />
@@ -1731,7 +1743,7 @@ export default function StudentDashboard() {
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
                       target.style.display = 'none';
-                      target.parentElement!.innerHTML = '<span className="text-white font-bold text-lg bg-linear-to-br from-pink-600 to-purple-800 w-10 h-10 rounded-xl flex items-center justify-center">SAA</span>';
+                      target.parentElement!.innerHTML = '<span class="text-white font-bold text-lg bg-linear-to-br from-pink-600 to-purple-800 w-10 h-10 rounded-xl flex items-center justify-center">SAA</span>';
                     }}
                   />
                 </div>
@@ -1758,7 +1770,7 @@ export default function StudentDashboard() {
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
                       target.style.display = 'none';
-                      target.parentElement!.innerHTML = '<span className="text-white font-bold text-lg bg-linear-to-br from-pink-600 to-purple-800 w-10 h-10 rounded-xl flex items-center justify-center">SAA</span>';
+                      target.parentElement!.innerHTML = '<span class="text-white font-bold text-lg bg-linear-to-br from-pink-600 to-purple-800 w-10 h-10 rounded-xl flex items-center justify-center">SAA</span>';
                     }}
                   />
                 </div>
