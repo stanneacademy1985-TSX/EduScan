@@ -1373,9 +1373,9 @@ export default function QRScannerPage() {
         {activeTab === 'scanner' ? (
           <>
             <div className="lg:col-span-2 bg-white rounded-xl shadow-xs border border-gray-200 p-4 sm:p-6">
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                 <h2 className="text-lg font-semibold text-gray-800">Camera Feed</h2>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
                   {scannerActive ? (
                     <span className="flex items-center gap-1 text-green-600 text-sm">
                       <Zap className="w-4 h-4" />
@@ -1394,14 +1394,14 @@ export default function QRScannerPage() {
                       scannerActive 
                         ? 'bg-red-600 hover:bg-red-700 text-white'
                         : 'bg-blue-600 hover:bg-blue-700 text-white'
-                    } ${cameraPermission === false ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    } ${cameraPermission === false ? 'opacity-50 cursor-not-allowed' : ''} w-full sm:w-auto`}
                   >
                     {scannerActive ? 'Stop Camera' : 'Start Camera'}
                   </button>
                 </div>
               </div>
 
-              <div className="relative aspect-video bg-gray-900 rounded-lg overflow-hidden">
+              <div className="relative w-full aspect-3/4 sm:aspect-video max-h-[70vh] sm:max-h-none bg-gray-900 rounded-lg overflow-hidden">
                 {cameraPermission === false ? (
                   <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
                     <CameraOff className="w-12 h-12 mb-4 opacity-50" />
@@ -1425,12 +1425,12 @@ export default function QRScannerPage() {
                       style={{ display: 'none' }}
                     />
                     
-                    <div className="absolute inset-0 border-4 border-blue-500/30 pointer-events-none">
-                      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64">
-                        <div className="absolute top-0 left-0 w-12 h-12 border-t-4 border-l-4 border-blue-500"></div>
-                        <div className="absolute top-0 right-0 w-12 h-12 border-t-4 border-r-4 border-blue-500"></div>
-                        <div className="absolute bottom-0 left-0 w-12 h-12 border-b-4 border-l-4 border-blue-500"></div>
-                        <div className="absolute bottom-0 right-0 w-12 h-12 border-b-4 border-r-4 border-blue-500"></div>
+                    <div className="absolute inset-0 border-2 sm:border-4 border-blue-500/30 pointer-events-none">
+                      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-40 h-40 sm:w-56 sm:h-56 lg:w-64 lg:h-64">
+                        <div className="absolute top-0 left-0 w-8 h-8 sm:w-12 sm:h-12 border-t-4 border-l-4 border-blue-500"></div>
+                        <div className="absolute top-0 right-0 w-8 h-8 sm:w-12 sm:h-12 border-t-4 border-r-4 border-blue-500"></div>
+                        <div className="absolute bottom-0 left-0 w-8 h-8 sm:w-12 sm:h-12 border-b-4 border-l-4 border-blue-500"></div>
+                        <div className="absolute bottom-0 right-0 w-8 h-8 sm:w-12 sm:h-12 border-b-4 border-r-4 border-blue-500"></div>
                       </div>
                     </div>
 
@@ -1458,7 +1458,7 @@ export default function QRScannerPage() {
                 )}
               </div>
 
-              <p className="text-sm text-gray-500 mt-4 text-center">
+              <p className="text-xs sm:text-sm text-gray-500 mt-4 text-center">
                 Position the QR code within the frame to scan automatically
               </p>
             </div>
