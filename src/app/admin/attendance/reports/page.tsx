@@ -818,93 +818,50 @@ export default function AttendanceReportsPage() {
     }
   }
 
-  const handleExportExcel = () => {
-    try {
-      setExporting(true)
+const handleExportExcel = () => {
+  try {
+    setExporting(true)
 
-      const workbook = XLSX.utils.book_new()
+    const workbook = XLSX.utils.book_new()
 
-      const overviewData = [{
-        'Report Period': `${dateRange.start} to ${dateRange.end}`,
-        'Generated On': new Date().toLocaleString(),
-        'Total Students': summary.totalStudents,
-        'Total Teachers': summary.totalTeachers,
-        'Total Records': summary.totalAttendance,
-        'Present': summary.presentCount,
-        'Late': summary.lateCount,
-        'Absent': summary.absentCount,
-        'Present %': summary.totalAttendance > 0 ? Math.round((summary.presentCount / summary.totalAttendance) * 100) + '%' : '0%',
-        'Late %': summary.totalAttendance > 0 ? Math.round((summary.lateCount / summary.totalAttendance) * 100) + '%' : '0%',
-        'Absent %': summary.totalAttendance > 0 ? Math.round((summary.absentCount / summary.totalAttendance) * 100) + '%' : '0%',
-        'Avg per Student': summary.averageAttendance,
-        'Most Active Grade': summary.mostActiveGrade,
-        'Top Performer': summary.topPerformer
-      }]
-      
-      const overviewHheet = XLSX.utils.json_to_sheet(overviewData)
-      overviewHheet['!cols'] = [
-        { wch: 20 }, { wch: 25 }, { wch: 15 }, { wch: 15 }, { wch: 15 },
-        { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 },
-        { wch: 10 }, { wch: 15 }, { wch: 20 }, { wch: 20 }
-      ]
-      
-      XLSX.utils.book_append_sheet(workbook, overviewHheet, 'Overview')
+    // Prepare student data for all teachers
+    const studentRows: any[] = []
 
-      teacherHummaries.forEach(teacher => {
-        const teacherData = teacher.students.map(s => ({
-          'Student Name': s.student_name,
-          'LRN': s.lrn,
-          'Grade': s.grade,
-          'Total Sessions': s.total_sessions,
-          'Present': s.present,
-          'Late': s.late,
-          'Absent': s.absent,
-          'Present %': s.total_sessions > 0 ? Math.round((s.present / s.total_sessions) * 100) + '%' : '0%',
-          'Late %': s.total_sessions > 0 ? Math.round((s.late / s.total_sessions) * 100) + '%' : '0%',
-          'Absent %': s.total_sessions > 0 ? Math.round((s.absent / s.total_sessions) * 100) + '%' : '0%',
-          'Attendance Rate': s.attendance_rate + '%'
-        }))
-
-        const sheet = XLSX.utils.json_to_sheet(teacherData)
-        sheet['!cols'] = [
-          { wch: 30 }, { wch: 15 }, { wch: 8 },
-          { wch: 12 }, { wch: 8 }, { wch: 8 }, { wch: 8 },
-          { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 12 }
-        ]
-
-        let sheetName = teacher.teacher_name.substring(0, 25)
-        XLSX.utils.book_append_sheet(workbook, sheet, sheetName)
+    teacherHummaries.forEach(teacher => {
+      teacher.students.forEach(student => {
+        studentRows.push({
+          Name: student.student_name,
+          Grade: student.grade,
+          Sessions: student.total_sessions,
+          Present: student.present,
+          Late: student.late,
+          Absent: student.absent
+        })
       })
+    })
 
-      const teacherSummaryData = teacherHummaries.map(t => ({
-        'Teacher': t.teacher_name,
-        'Students': t.total_students,
-        'Total Sessions': t.total_sessions,
-        'Present': t.present_count,
-        'Late': t.late_count,
-        'Absent': t.absent_count,
-        'Present %': t.total_sessions > 0 ? Math.round((t.present_count / t.total_sessions) * 100) + '%' : '0%',
-        'Late %': t.total_sessions > 0 ? Math.round((t.late_count / t.total_sessions) * 100) + '%' : '0%',
-        'Absent %': t.total_sessions > 0 ? Math.round((t.absent_count / t.total_sessions) * 100) + '%' : '0%',
-        'Attendance Rate': t.attendance_rate + '%'
-      }))
+    // Sort by Name
+    studentRows.sort((a, b) => a.Name.localeCompare(b.Name))
 
-      const teacherSummaryHheet = XLSX.utils.json_to_sheet(teacherSummaryData)
-      teacherSummaryHheet['!cols'] = [
-        { wch: 30 }, { wch: 10 }, { wch: 15 }, { wch: 10 },
-        { wch: 8 }, { wch: 8 }, { wch: 10 }, { wch: 10 },
-        { wch: 10 }, { wch: 15 }
-      ]
-      
-      XLSX.utils.book_append_sheet(workbook, teacherSummaryHheet, 'Teacher Summary')
+    const studentSheet = XLSX.utils.json_to_sheet(studentRows)
+    studentSheet['!cols'] = [
+      { wch: 35 }, // Name
+      { wch: 10 }, // Grade
+      { wch: 12 }, // Sessions
+      { wch: 10 }, // Present
+      { wch: 8 },  // Late
+      { wch: 10 }  // Absent
+    ]
 
-      XLSX.writeFile(workbook, `attendance_report_${dateRange.start}_to_${dateRange.end}.xlsx`)
-    } catch (error) {
-      console.error('Error exporting Excel:', error)
-    } finally {
-      setExporting(false)
-    }
+    XLSX.utils.book_append_sheet(workbook, studentSheet, 'Students Attendance')
+
+    XLSX.writeFile(workbook, `attendance_report_${dateRange.start}_to_${dateRange.end}.xlsx`)
+  } catch (error) {
+    console.error('Error exporting Excel:', error)
+  } finally {
+    setExporting(false)
   }
+}
 
   const handleClearAttendance = async () => {
     try {
