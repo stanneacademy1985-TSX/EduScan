@@ -1259,7 +1259,7 @@ const handleExportExcel = () => {
           )}
         </div>
 
-        {/* Teacher Summary View */}
+              {/* Teacher Summary View */}
         {viewMode === 'teacher' && (
           <div className="space-y-4">
             {teacherHummaries.length === 0 ? (
@@ -1273,7 +1273,12 @@ const handleExportExcel = () => {
                 </div>
               </div>
             ) : (
-              paginatedTeachers.map((teacher) => (
+              paginatedTeachers.map((teacher) => {
+                // Separate students by grade
+                const grade11Students = teacher.students.filter(s => s.grade === '11')
+                const grade12Students = teacher.students.filter(s => s.grade === '12')
+                
+                return (
                 <div
                   key={teacher.teacher_id}
                   className="bg-white rounded-2xl shadow-md hover:shadow-lg transition-all duration-300 border border-slate-100 overflow-hidden"
@@ -1338,76 +1343,176 @@ const handleExportExcel = () => {
                     </div>
                   </div>
 
-                  {/* Student Table */}
+                  {/* Student Tables - Separated by Grade */}
                   {expandedTeachers.has(teacher.teacher_id) && (
-                    <div className="overflow-x-auto animate-in slide-in-from-top-4">
-                      <table className="w-full min-w-[860px]">
-                        <thead className="bg-slate-50">
-                          <tr>
-                            <th className="px-3 sm:px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Student Information</th>
-                            <th className="px-3 sm:px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Grade</th>
-                            <th className="px-3 sm:px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Sessions</th>
-                            <th className="px-3 sm:px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Present</th>
-                            <th className="px-3 sm:px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Late</th>
-                            <th className="px-3 sm:px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Absent</th>
-                            <th className="px-3 sm:px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Rate</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {teacher.students.map((student, idx) => (
-                            <tr key={student.student_id} className="hover:bg-slate-50 transition-colors duration-150">
-                              <td className="px-3 sm:px-6 py-4">
-                                <div className="flex items-center gap-3">
-                                  {student.profile_photo_base64 ? (
-                                    <img src={student.profile_photo_base64} alt={student.student_name} className="w-8 h-8 rounded-full object-cover border-2 border-slate-200" />
-                                  ) : (
-                                    <div className="w-8 h-8 bg-linear-to-br from-indigo-600 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
-                                      {student.student_name.charAt(0)}
-                                    </div>
-                                  )}
-                                  <div>
-                                    <p className="font-medium text-slate-900">{student.student_name}</p>
-                                    <p className="text-xs text-slate-500">LRN: {student.lrn}</p>
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="px-3 sm:px-6 py-4">
-                                <span className="px-3 py-1.5 bg-linear-to-r from-indigo-50 to-purple-50 text-indigo-700 rounded-xl text-xs font-medium border border-indigo-100">
-                                  Grade {student.grade}
-                                </span>
-                              </td>
-                              <td className="px-3 sm:px-6 py-4 font-semibold text-slate-900">{student.total_sessions}</td>
-                              <td className="px-3 sm:px-6 py-4">
-                                <span className="px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-medium border border-emerald-100">{student.present}</span>
-                              </td>
-                              <td className="px-3 sm:px-6 py-4">
-                                <span className="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-xl text-xs font-medium border border-amber-100">{student.late}</span>
-                              </td>
-                              <td className="px-3 sm:px-6 py-4">
-                                <span className="px-3 py-1.5 bg-rose-50 text-rose-700 rounded-xl text-xs font-medium border border-rose-100">{student.absent}</span>
-                              </td>
-                              <td className="px-3 sm:px-6 py-4">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-16 h-2 bg-slate-200 rounded-full overflow-hidden">
-                                    <div className={`h-full rounded-full transition-all duration-500 ${
-                                      student.attendance_rate >= 90 ? 'bg-emerald-500' :
-                                      student.attendance_rate >= 75 ? 'bg-amber-500' : 'bg-rose-500'
-                                    }`} style={{ width: `${student.attendance_rate}%` }} />
-                                  </div>
-                                  <span className={`text-sm font-medium ${
-                                    student.attendance_rate >= 90 ? 'text-emerald-700' :
-                                    student.attendance_rate >= 75 ? 'text-amber-700' : 'text-rose-700'
-                                  }`}>{student.attendance_rate}%</span>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                    <div className="p-4 space-y-6">
+                      {/* Grade 11 Section */}
+                      {grade11Students.length > 0 && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-3 pb-2 border-b border-indigo-200">
+                            <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center">
+                              <span className="text-xs font-bold text-indigo-600">11</span>
+                            </div>
+                            <h4 className="text-md font-semibold text-indigo-700">Grade 11 Students</h4>
+                            <span className="text-xs text-slate-400 ml-auto">{grade11Students.length} students</span>
+                          </div>
+                          <div className="overflow-x-auto">
+                            <table className="w-full min-w-[860px]">
+                              <thead className="bg-slate-50">
+                                <tr>
+                                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Student Information</th>
+                                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Section</th>
+                                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Sessions</th>
+                                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Present</th>
+                                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Late</th>
+                                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Absent</th>
+                                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Rate</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {grade11Students.map((student) => (
+                                  <tr key={student.student_id} className="hover:bg-slate-50 transition-colors duration-150">
+                                    <td className="px-3 sm:px-6 py-3">
+                                      <div className="flex items-center gap-3">
+                                        {student.profile_photo_base64 ? (
+                                          <img src={student.profile_photo_base64} alt={student.student_name} className="w-8 h-8 rounded-full object-cover border-2 border-slate-200" />
+                                        ) : (
+                                          <div className="w-8 h-8 bg-linear-to-br from-indigo-600 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                                            {student.student_name.charAt(0)}
+                                          </div>
+                                        )}
+                                        <div>
+                                          <p className="font-medium text-slate-900">{student.student_name}</p>
+                                          <p className="text-xs text-slate-500">LRN: {student.lrn}</p>
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="px-3 sm:px-6 py-3">
+                                      <span className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-xl text-xs font-medium">
+                                        Section {student.section}
+                                      </span>
+                                    </td>
+                                    <td className="px-3 sm:px-6 py-3 font-semibold text-slate-900">{student.total_sessions}</td>
+                                    <td className="px-3 sm:px-6 py-3">
+                                      <span className="px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-medium border border-emerald-100">{student.present}</span>
+                                    </td>
+                                    <td className="px-3 sm:px-6 py-3">
+                                      <span className="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-xl text-xs font-medium border border-amber-100">{student.late}</span>
+                                    </td>
+                                    <td className="px-3 sm:px-6 py-3">
+                                      <span className="px-3 py-1.5 bg-rose-50 text-rose-700 rounded-xl text-xs font-medium border border-rose-100">{student.absent}</span>
+                                    </td>
+                                    <td className="px-3 sm:px-6 py-3">
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-16 h-2 bg-slate-200 rounded-full overflow-hidden">
+                                          <div className={`h-full rounded-full transition-all duration-500 ${
+                                            student.attendance_rate >= 90 ? 'bg-emerald-500' :
+                                            student.attendance_rate >= 75 ? 'bg-amber-500' : 'bg-rose-500'
+                                          }`} style={{ width: `${student.attendance_rate}%` }} />
+                                        </div>
+                                        <span className={`text-sm font-medium ${
+                                          student.attendance_rate >= 90 ? 'text-emerald-700' :
+                                          student.attendance_rate >= 75 ? 'text-amber-700' : 'text-rose-700'
+                                        }`}>{student.attendance_rate}%</span>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Grade 12 Section */}
+                      {grade12Students.length > 0 && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-3 pb-2 border-b border-purple-200">
+                            <div className="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center">
+                              <span className="text-xs font-bold text-purple-600">12</span>
+                            </div>
+                            <h4 className="text-md font-semibold text-purple-700">Grade 12 Students</h4>
+                            <span className="text-xs text-slate-400 ml-auto">{grade12Students.length} students</span>
+                          </div>
+                          <div className="overflow-x-auto">
+                            <table className="w-full min-w-[860px]">
+                              <thead className="bg-slate-50">
+                                <tr>
+                                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Student Information</th>
+                                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Section</th>
+                                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Sessions</th>
+                                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Present</th>
+                                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Late</th>
+                                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Absent</th>
+                                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Rate</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {grade12Students.map((student) => (
+                                  <tr key={student.student_id} className="hover:bg-slate-50 transition-colors duration-150">
+                                    <td className="px-3 sm:px-6 py-3">
+                                      <div className="flex items-center gap-3">
+                                        {student.profile_photo_base64 ? (
+                                          <img src={student.profile_photo_base64} alt={student.student_name} className="w-8 h-8 rounded-full object-cover border-2 border-slate-200" />
+                                        ) : (
+                                          <div className="w-8 h-8 bg-linear-to-br from-indigo-600 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                                            {student.student_name.charAt(0)}
+                                          </div>
+                                        )}
+                                        <div>
+                                          <p className="font-medium text-slate-900">{student.student_name}</p>
+                                          <p className="text-xs text-slate-500">LRN: {student.lrn}</p>
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="px-3 sm:px-6 py-3">
+                                      <span className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-xl text-xs font-medium">
+                                        Section {student.section}
+                                      </span>
+                                    </td>
+                                    <td className="px-3 sm:px-6 py-3 font-semibold text-slate-900">{student.total_sessions}</td>
+                                    <td className="px-3 sm:px-6 py-3">
+                                      <span className="px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-medium border border-emerald-100">{student.present}</span>
+                                    </td>
+                                    <td className="px-3 sm:px-6 py-3">
+                                      <span className="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-xl text-xs font-medium border border-amber-100">{student.late}</span>
+                                    </td>
+                                    <td className="px-3 sm:px-6 py-3">
+                                      <span className="px-3 py-1.5 bg-rose-50 text-rose-700 rounded-xl text-xs font-medium border border-rose-100">{student.absent}</span>
+                                    </td>
+                                    <td className="px-3 sm:px-6 py-3">
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-16 h-2 bg-slate-200 rounded-full overflow-hidden">
+                                          <div className={`h-full rounded-full transition-all duration-500 ${
+                                            student.attendance_rate >= 90 ? 'bg-emerald-500' :
+                                            student.attendance_rate >= 75 ? 'bg-amber-500' : 'bg-rose-500'
+                                          }`} style={{ width: `${student.attendance_rate}%` }} />
+                                        </div>
+                                        <span className={`text-sm font-medium ${
+                                          student.attendance_rate >= 90 ? 'text-emerald-700' :
+                                          student.attendance_rate >= 75 ? 'text-amber-700' : 'text-rose-700'
+                                        }`}>{student.attendance_rate}%</span>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* No students message */}
+                      {grade11Students.length === 0 && grade12Students.length === 0 && (
+                        <div className="text-center py-8 text-slate-500">
+                          No students assigned to this teacher
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
-              ))
+              )
+              })
             )}
 
             {/* Pagination */}
