@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../../../../lib/supabase'
-import { generateEncryptedQRCode } from '../../../../lib/qr-generator' // Changed import
+import { generateEncryptedQRCode } from '../../../../lib/qr-generator'
 import { RegisterFormData } from '../../../../lib/types'
 import { AuthUtils } from '../../../../lib/auth-utils'
 import Link from 'next/link'
@@ -171,10 +171,13 @@ export default function RegisterPage() {
     const file = e.target.files?.[0]
     if (!file) return
 
+    // Reset error and clear previous state
+    setError('')
+    
     // Validate file type
-    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif']
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
     if (!validTypes.includes(file.type)) {
-      setError('Please upload a valid image file (JPEG, PNG, GIF)')
+      setError('Please upload a valid image file (JPEG, PNG, GIF, WebP)')
       return
     }
 
@@ -190,23 +193,27 @@ export default function RegisterPage() {
       URL.revokeObjectURL(previewUrl)
     }
 
-    // Create preview URL
-    const url = URL.createObjectURL(file)
-    setPreviewUrl(url)
-    setFormData(prev => ({ ...prev, profilePhoto: file }))
-    setError('')
-    
-    // Simulate upload progress
-    setUploadProgress(0)
-    const interval = setInterval(() => {
-      setUploadProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval)
-          return 100
-        }
-        return prev + 10
-      })
-    }, 50)
+    // Create preview URL and update form data
+    try {
+      const url = URL.createObjectURL(file)
+      setPreviewUrl(url)
+      setFormData(prev => ({ ...prev, profilePhoto: file }))
+      
+      // Simulate upload progress
+      setUploadProgress(0)
+      const interval = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev >= 100) {
+            clearInterval(interval)
+            return 100
+          }
+          return prev + 10
+        })
+      }, 50)
+    } catch (err) {
+      console.error('Error processing image:', err)
+      setError('Failed to process image. Please try again.')
+    }
   }
 
   const removePhoto = () => {
@@ -216,6 +223,45 @@ export default function RegisterPage() {
     setPreviewUrl('')
     setFormData(prev => ({ ...prev, profilePhoto: null }))
     setUploadProgress(0)
+  }
+
+  // Helper function to convert file to base64 with error handling
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      // Check if file is valid
+      if (!file || file.size === 0) {
+        reject(new Error('Invalid or empty file'))
+        return
+      }
+
+      const reader = new FileReader()
+      
+      reader.onload = () => {
+        const result = reader.result as string
+        if (!result) {
+          reject(new Error('Failed to read image file'))
+          return
+        }
+        resolve(result)
+      }
+      
+      reader.onerror = () => {
+        console.error('FileReader error:', reader.error)
+        reject(new Error(`Failed to read image file: ${reader.error?.message || 'Unknown error'}`))
+      }
+
+      reader.onabort = () => {
+        reject(new Error('File reading was aborted'))
+      }
+
+      // Read the file
+      try {
+        reader.readAsDataURL(file)
+      } catch (err) {
+        console.error('readAsDataURL error:', err)
+        reject(new Error('Failed to read image file. Browser may not support this operation.'))
+      }
+    })
   }
 
   const nextStep = () => {
@@ -272,18 +318,17 @@ export default function RegisterPage() {
       // Hash the password
       const hashedPassword = await AuthUtils.hashPassword(formData.password)
       
-      // Convert profile photo to base64 if exists
+      // Convert profile photo to base64 if exists - with improved error handling
       let photoBase64 = null
       if (formData.profilePhoto) {
-        photoBase64 = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader()
-          reader.onload = () => {
-            const result = reader.result as string
-            resolve(result)
-          }
-          reader.onerror = () => reject(new Error('Failed to read image file'))
-          reader.readAsDataURL(formData.profilePhoto!)
-        })
+        try {
+          photoBase64 = await fileToBase64(formData.profilePhoto)
+        } catch (photoError: any) {
+          // Log the error but allow registration to continue without photo
+          console.error('Photo conversion failed:', photoError)
+          setError('Failed to process profile photo. Registration will continue without it.')
+          // Continue without photo
+        }
       }
 
       // Generate encrypted QR code automatically
@@ -390,6 +435,11 @@ export default function RegisterPage() {
                           src={previewUrl} 
                           alt="Profile preview" 
                           className="w-full h-full object-cover"
+                          onError={(e) => {
+                            // Fallback for broken image preview
+                            setError('Failed to load image preview')
+                            removePhoto()
+                          }}
                         />
                       </div>
                       <button
@@ -407,6 +457,8 @@ export default function RegisterPage() {
                         accept="image/*"
                         onChange={handlePhotoUpload}
                         className="hidden"
+                        // Add capture attribute for mobile devices
+                        capture="environment"
                       />
                       <div className="w-32 h-32 rounded-full border-2 border-dashed border-gray-300 flex flex-col items-center justify-center bg-gray-50 hover:bg-gray-100 transition-colors group-hover:border-blue-400">
                         <Camera className="w-10 h-10 text-gray-400 mb-2" />
@@ -424,7 +476,7 @@ export default function RegisterPage() {
                       <ul className="text-xs text-gray-500 space-y-1">
                         <li className="flex items-center">
                           <div className="w-1.5 h-1.5 bg-blue-400 rounded-full mr-2"></div>
-                          File types: JPG, PNG, GIF
+                          File types: JPG, PNG, GIF, WebP
                         </li>
                         <li className="flex items-center">
                           <div className="w-1.5 h-1.5 bg-blue-400 rounded-full mr-2"></div>
@@ -440,7 +492,7 @@ export default function RegisterPage() {
                     {uploadProgress > 0 && uploadProgress < 100 && (
                       <div className="space-y-1">
                         <div className="flex justify-between text-xs text-gray-600">
-                          <span>Uploading...</span>
+                          <span>Processing...</span>
                           <span>{uploadProgress}%</span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-1.5">
@@ -455,7 +507,7 @@ export default function RegisterPage() {
                     {uploadProgress === 100 && (
                       <div className="flex items-center text-green-600 text-sm">
                         <CheckCircle className="w-4 h-4 mr-2" />
-                        Photo uploaded successfully
+                        Photo ready
                       </div>
                     )}
 
@@ -469,6 +521,7 @@ export default function RegisterPage() {
                             accept="image/*"
                             onChange={handlePhotoUpload}
                             className="hidden"
+                            capture="environment"
                           />
                         </label>
                       </div>
