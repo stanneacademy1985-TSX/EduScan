@@ -16,6 +16,9 @@ export default function SuperAdminLogin() {
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [agreedToPolicies, setAgreedToPolicies] = useState(false)
+  const [showPolicyModal, setShowPolicyModal] = useState(false)
+  const [activePolicy, setActivePolicy] = useState<'terms' | 'privacy'>('terms')
   const [isClient, setIsClient] = useState(false)
 
   useEffect(() => {
@@ -34,6 +37,12 @@ export default function SuperAdminLogin() {
 
     if (!formData.email || !formData.password) {
       setError('Please fill in all fields')
+      setLoading(false)
+      return
+    }
+
+    if (!agreedToPolicies) {
+      setError('You must agree to the Terms of Service and Privacy Policy to continue')
       setLoading(false)
       return
     }
@@ -298,19 +307,204 @@ export default function SuperAdminLogin() {
               )}
             </button>
 
+            <label className="flex items-start gap-2 text-sm text-gray-600">
+              <input
+                type="checkbox"
+                checked={agreedToPolicies}
+                onChange={(e) => {
+                  setAgreedToPolicies(e.target.checked)
+                  setError('')
+                }}
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              <span>
+                I agree to the{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActivePolicy('terms')
+                    setShowPolicyModal(true)
+                  }}
+                  className="text-indigo-600 hover:text-indigo-800 font-medium"
+                >
+                  Terms of Service
+                </button>{' '}
+                and{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActivePolicy('privacy')
+                    setShowPolicyModal(true)
+                  }}
+                  className="text-indigo-600 hover:text-indigo-800 font-medium"
+                >
+                  Privacy Policy
+                </button>
+                .
+              </span>
+            </label>
+
             <div className="text-center text-xs text-gray-500 max-w-sm mx-auto pt-4">
               <p>
                 By signing in you agree to our{' '}
-                <Link href="/terms" className="text-indigo-600 hover:text-indigo-800 font-medium">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActivePolicy('terms')
+                    setShowPolicyModal(true)
+                  }}
+                  className="text-indigo-600 hover:text-indigo-800 font-medium"
+                >
                   Terms of Service
-                </Link>{' '}
+                </button>{' '}
                 and{' '}
-                <Link href="/privacy" className="text-indigo-600 hover:text-indigo-800 font-medium">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActivePolicy('privacy')
+                    setShowPolicyModal(true)
+                  }}
+                  className="text-indigo-600 hover:text-indigo-800 font-medium"
+                >
                   Privacy Policy
-                </Link>
+                </button>
                 .
               </p>
             </div>
+
+            {showPolicyModal && (
+              <div
+                className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+                onClick={() => setShowPolicyModal(false)}
+              >
+                <div
+                  className="w-full max-w-2xl bg-white rounded-2xl shadow-xl border border-gray-200"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
+                    <h3 className="text-lg font-bold text-gray-900">
+                      {activePolicy === 'terms' ? 'Terms of Service' : 'Privacy Policy'}
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setShowPolicyModal(false)}
+                      className="text-gray-500 hover:text-gray-700 text-sm"
+                    >
+                      Close
+                    </button>
+                  </div>
+
+                  <div className="px-5 pt-4 pb-2 flex gap-2 border-b border-gray-100">
+                    <button
+                      type="button"
+                      onClick={() => setActivePolicy('terms')}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
+                        activePolicy === 'terms'
+                          ? 'bg-indigo-100 text-indigo-700'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Terms of Service
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActivePolicy('privacy')}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
+                        activePolicy === 'privacy'
+                          ? 'bg-indigo-100 text-indigo-700'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Privacy Policy
+                    </button>
+                  </div>
+
+                  <div className="px-5 py-4 max-h-[60vh] overflow-y-auto text-sm text-gray-700 space-y-4">
+                    {activePolicy === 'terms' ? (
+                      <>
+                        <section>
+                          <h4 className="font-semibold text-gray-900">1. Authorized Use</h4>
+                          <p className="mt-1">
+                            The Super Admin portal is only for authorized school administrators performing official duties.
+                          </p>
+                        </section>
+                        <section>
+                          <h4 className="font-semibold text-gray-900">2. Account Security</h4>
+                          <p className="mt-1">
+                            You must keep credentials confidential and immediately report suspected unauthorized access.
+                          </p>
+                        </section>
+                        <section>
+                          <h4 className="font-semibold text-gray-900">3. Responsible Data Handling</h4>
+                          <p className="mt-1">
+                            Attendance and profile records must be processed accurately and used only for legitimate school operations.
+                          </p>
+                        </section>
+                        <section>
+                          <h4 className="font-semibold text-gray-900">4. Prohibited Actions</h4>
+                          <p className="mt-1">
+                            Unauthorized modification, deletion, export, or disclosure of data is strictly prohibited.
+                          </p>
+                        </section>
+                        <section>
+                          <h4 className="font-semibold text-gray-900">5. Policy Updates</h4>
+                          <p className="mt-1">
+                            The school may revise these terms when required by policy, security, or legal obligations.
+                          </p>
+                        </section>
+                        <button
+                          type="button"
+                          onClick={() => setActivePolicy('privacy')}
+                          className="text-indigo-600 hover:text-indigo-800 font-medium"
+                        >
+                          Read Privacy Policy
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <section>
+                          <h4 className="font-semibold text-gray-900">1. Data We Process</h4>
+                          <p className="mt-1">
+                            EduScan processes account, attendance, and operational data needed for school administration.
+                          </p>
+                        </section>
+                        <section>
+                          <h4 className="font-semibold text-gray-900">2. Purpose of Processing</h4>
+                          <p className="mt-1">
+                            Data is used for attendance management, reporting, account administration, and system oversight.
+                          </p>
+                        </section>
+                        <section>
+                          <h4 className="font-semibold text-gray-900">3. Access and Sharing</h4>
+                          <p className="mt-1">
+                            Access is restricted to authorized personnel. Information is shared only as necessary for school operations.
+                          </p>
+                        </section>
+                        <section>
+                          <h4 className="font-semibold text-gray-900">4. Security Controls</h4>
+                          <p className="mt-1">
+                            Technical and administrative safeguards are applied to reduce unauthorized access and data misuse.
+                          </p>
+                        </section>
+                        <section>
+                          <h4 className="font-semibold text-gray-900">5. Retention and Corrections</h4>
+                          <p className="mt-1">
+                            Records are retained according to school policy, and corrections may be requested through approved procedures.
+                          </p>
+                        </section>
+                        <button
+                          type="button"
+                          onClick={() => setActivePolicy('terms')}
+                          className="text-indigo-600 hover:text-indigo-800 font-medium"
+                        >
+                          Read Terms of Service
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="relative my-8">
               <div className="absolute inset-0 flex items-center">
