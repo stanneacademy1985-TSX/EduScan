@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../../../../lib/supabase'
-import { generateEncryptedQRCode } from '../../../../lib/qr-generator' // Changed import
+import { generateEncryptedQRCode } from '../../../../lib/qr-generator'
 import { RegisterFormData } from '../../../../lib/types'
 import { AuthUtils } from '../../../../lib/auth-utils'
 import Link from 'next/link'
@@ -171,17 +171,21 @@ export default function RegisterPage() {
     const file = e.target.files?.[0]
     if (!file) return
 
-    // Validate file type
-    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif']
-    if (!validTypes.includes(file.type)) {
-      setError('Please upload a valid image file (JPEG, PNG, GIF)')
+    // Validate file type - using MIME types that work on mobile
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/heic', 'image/heif', 'image/webp']
+    // Also check by extension for mobile devices that might not report MIME types correctly
+    const validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.heic', '.heif', '.webp']
+    const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase()
+    
+    if (!validTypes.includes(file.type) && !validExtensions.includes(fileExtension)) {
+      setError('Please upload a valid image file (JPEG, PNG, GIF, HEIC, WebP)')
       return
     }
 
-    // Validate file size (max 2MB for base64)
-    const maxSize = 2 * 1024 * 1024 // 2MB
+    // Validate file size (max 5MB for mobile compatibility)
+    const maxSize = 5 * 1024 * 1024 // 5MB
     if (file.size > maxSize) {
-      setError('Image size should be less than 2MB for optimal performance')
+      setError('Image size should be less than 5MB')
       return
     }
 
@@ -191,22 +195,27 @@ export default function RegisterPage() {
     }
 
     // Create preview URL
-    const url = URL.createObjectURL(file)
-    setPreviewUrl(url)
-    setFormData(prev => ({ ...prev, profilePhoto: file }))
-    setError('')
-    
-    // Simulate upload progress
-    setUploadProgress(0)
-    const interval = setInterval(() => {
-      setUploadProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval)
-          return 100
-        }
-        return prev + 10
-      })
-    }, 50)
+    try {
+      const url = URL.createObjectURL(file)
+      setPreviewUrl(url)
+      setFormData(prev => ({ ...prev, profilePhoto: file }))
+      setError('')
+      
+      // Simulate upload progress
+      setUploadProgress(0)
+      const interval = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev >= 100) {
+            clearInterval(interval)
+            return 100
+          }
+          return prev + 10
+        })
+      }, 50)
+    } catch (err) {
+      console.error('Error creating preview:', err)
+      setError('Failed to preview image. Please try another photo.')
+    }
   }
 
   const removePhoto = () => {
@@ -250,6 +259,76 @@ export default function RegisterPage() {
     }
   }
 
+  // Improved file reading function with better error handling for mobile
+  const readFileAsBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      // Check if FileReader is supported
+      if (!window.FileReader) {
+        reject(new Error('FileReader is not supported in this browser'))
+        return
+      }
+
+      const reader = new FileReader()
+      
+      // Set a timeout for slow mobile devices
+      const timeout = setTimeout(() => {
+        reader.abort()
+        reject(new Error('File reading timed out. Please try a smaller image or different format.'))
+      }, 30000) // 30 second timeout
+
+      reader.onload = () => {
+        clearTimeout(timeout)
+        try {
+          const result = reader.result as string
+          if (!result) {
+            reject(new Error('Failed to read image file - empty result'))
+            return
+          }
+          // Validate that it's actually a base64 image
+          if (!result.startsWith('data:image/')) {
+            reject(new Error('Invalid image format detected'))
+            return
+          }
+          resolve(result)
+        } catch (err) {
+          reject(new Error('Failed to process image data'))
+        }
+      }
+
+      reader.onerror = (error) => {
+        clearTimeout(timeout)
+        console.error('FileReader error:', reader.error)
+        // Provide more specific error messages based on error type
+        switch (reader.error?.code) {
+          case DOMException.NOT_FOUND_ERR:
+            reject(new Error('Image file not found. Please try selecting the image again.'))
+            break
+          case DOMException.NOT_READABLE_ERR:
+            reject(new Error('Cannot read image file. The file might be corrupted or in use by another app.'))
+            break
+          case DOMException.SECURITY_ERR:
+            reject(new Error('Security error reading image. Please check your browser permissions.'))
+            break
+          default:
+            reject(new Error('Failed to read image file. Please try a different photo or format.'))
+        }
+      }
+
+      reader.onabort = () => {
+        clearTimeout(timeout)
+        reject(new Error('Image reading was cancelled'))
+      }
+
+      // Try reading the file
+      try {
+        reader.readAsDataURL(file)
+      } catch (err) {
+        clearTimeout(timeout)
+        reject(new Error('Failed to start reading image file. The file might be too large or unsupported.'))
+      }
+    })
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -275,15 +354,14 @@ export default function RegisterPage() {
       // Convert profile photo to base64 if exists
       let photoBase64 = null
       if (formData.profilePhoto) {
-        photoBase64 = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader()
-          reader.onload = () => {
-            const result = reader.result as string
-            resolve(result)
-          }
-          reader.onerror = () => reject(new Error('Failed to read image file'))
-          reader.readAsDataURL(formData.profilePhoto!)
-        })
+        try {
+          photoBase64 = await readFileAsBase64(formData.profilePhoto)
+        } catch (photoError: any) {
+          setError(photoError.message || 'Failed to process profile photo. Please try again without a photo or use a different image.')
+          setLoading(false)
+          setQrGenerating(false)
+          return
+        }
       }
 
       // Generate encrypted QR code automatically
@@ -390,6 +468,10 @@ export default function RegisterPage() {
                           src={previewUrl} 
                           alt="Profile preview" 
                           className="w-full h-full object-cover"
+                          onError={() => {
+                            setError('Failed to load image preview')
+                            removePhoto()
+                          }}
                         />
                       </div>
                       <button
@@ -407,6 +489,7 @@ export default function RegisterPage() {
                         accept="image/*"
                         onChange={handlePhotoUpload}
                         className="hidden"
+                        capture="user"
                       />
                       <div className="w-32 h-32 rounded-full border-2 border-dashed border-gray-300 flex flex-col items-center justify-center bg-gray-50 hover:bg-gray-100 transition-colors group-hover:border-blue-400">
                         <Camera className="w-10 h-10 text-gray-400 mb-2" />
@@ -424,15 +507,19 @@ export default function RegisterPage() {
                       <ul className="text-xs text-gray-500 space-y-1">
                         <li className="flex items-center">
                           <div className="w-1.5 h-1.5 bg-blue-400 rounded-full mr-2"></div>
-                          File types: JPG, PNG, GIF
+                          File types: JPG, PNG, GIF, WebP
                         </li>
                         <li className="flex items-center">
                           <div className="w-1.5 h-1.5 bg-blue-400 rounded-full mr-2"></div>
-                          Max file size: 2MB
+                          Max file size: 5MB
                         </li>
                         <li className="flex items-center">
                           <div className="w-1.5 h-1.5 bg-blue-400 rounded-full mr-2"></div>
                           Recommended: Square photo, clear face
+                        </li>
+                        <li className="flex items-center text-amber-600">
+                          <div className="w-1.5 h-1.5 bg-amber-400 rounded-full mr-2"></div>
+                          For mobile: Use camera or photo library
                         </li>
                       </ul>
                     </div>
@@ -440,7 +527,7 @@ export default function RegisterPage() {
                     {uploadProgress > 0 && uploadProgress < 100 && (
                       <div className="space-y-1">
                         <div className="flex justify-between text-xs text-gray-600">
-                          <span>Uploading...</span>
+                          <span>Processing...</span>
                           <span>{uploadProgress}%</span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-1.5">
@@ -455,7 +542,7 @@ export default function RegisterPage() {
                     {uploadProgress === 100 && (
                       <div className="flex items-center text-green-600 text-sm">
                         <CheckCircle className="w-4 h-4 mr-2" />
-                        Photo uploaded successfully
+                        Photo ready for upload
                       </div>
                     )}
 
@@ -469,6 +556,7 @@ export default function RegisterPage() {
                             accept="image/*"
                             onChange={handlePhotoUpload}
                             className="hidden"
+                            capture="user"
                           />
                         </label>
                       </div>
