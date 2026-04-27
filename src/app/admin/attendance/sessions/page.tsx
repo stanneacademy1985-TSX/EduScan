@@ -1275,8 +1275,8 @@ export default function AttendanceSessionsPage() {
 
       {/* Create Session Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-0 sm:p-4">
-          <div className="bg-white rounded-none sm:rounded-xl max-w-md w-full h-full sm:h-auto overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
             <div className="sticky top-0 bg-white border-b border-gray-200 p-4 sm:p-6">
               <div className="flex justify-between items-center">
                 <h3 className="text-lg sm:text-xl font-bold text-gray-800">Create New Session</h3>
@@ -1291,9 +1291,9 @@ export default function AttendanceSessionsPage() {
               </p>
             </div>
             
-            <form onSubmit={handleCreateSession} className="p-4 sm:p-6 space-y-4">
+            <form onSubmit={handleCreateSession} className="p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Grade */}
-              <div>
+              <div className="sm:col-span-1">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Select Grade <span className="text-red-500">*</span>
                 </label>
@@ -1308,16 +1308,32 @@ export default function AttendanceSessionsPage() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
                 >
                   <option value="">Choose a grade</option>
-                  <option value="11">Grade 11</option>
-                  <option value="12">Grade 12</option>
+                  {groupedSectionList.map(g => (
+                    <option key={g.grade} value={g.grade}>Grade {g.grade}</option>
+                  ))}
                 </select>
               </div>
 
+              {/* Section */}
+              <div className="sm:col-span-1">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Select Section</label>
+                <select
+                  value={newSession.section}
+                  onChange={(e) => setNewSession({ ...newSession, section: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+                >
+                  <option value="">Choose a section</option>
+                  {sections
+                    .filter(s => normalizeGrade(s.grade) === normalizeGrade(newSession.grade || ''))
+                    .sort((a,b) => a.section.localeCompare(b.section))
+                    .map(s => (
+                      <option key={`${s.grade}-${s.section}`} value={s.section}>{s.section} ({s.student_count})</option>
+                    ))}
+                </select>
+              </div>
               {/* Session Description */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Session Description
-                </label>
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Session Description</label>
                 <textarea
                   value={newSession.session_description}
                   onChange={(e) => setNewSession({ ...newSession, session_description: e.target.value })}
@@ -1329,10 +1345,8 @@ export default function AttendanceSessionsPage() {
               </div>
 
               {/* Date */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Session Date <span className="text-red-500">*</span>
-                </label>
+              <div className="sm:col-span-1">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Session Date <span className="text-red-500">*</span></label>
                 <input
                   type="date"
                   value={newSession.date}
@@ -1341,6 +1355,11 @@ export default function AttendanceSessionsPage() {
                   min={new Date().toISOString().split('T')[0]}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
                 />
+              </div>
+
+              <div className="sm:col-span-1">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Start Immediately</label>
+                <div className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-700">Session starts when created</div>
               </div>
 
               {/* Custom Time Thresholds */}
@@ -1379,30 +1398,19 @@ export default function AttendanceSessionsPage() {
                 </div>
               </div>
 
-              <div className="bg-blue-50 p-3 sm:p-4 rounded-lg">
+              <div className="sm:col-span-2 bg-blue-50 p-3 sm:p-4 rounded-lg">
                 <div className="flex items-start gap-2 sm:gap-3">
                   <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 mt-0.5 shrink-0" />
                   <div className="text-xs sm:text-sm text-blue-700">
-                    <p className="font-medium mb-1">Session will start immediately</p>
-                    <p>You will be automatically assigned as the teacher for this session.</p>
+                    <p className="font-medium mb-1">Session will start immediately upon creation</p>
+                    <p>You will be automatically assigned as the teacher for this session. Start time will be recorded as the current time.</p>
                   </div>
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
-                >
-                  Create Session
-                </button>
+              <div className="sm:col-span-2 flex gap-3 pt-4">
+                <button type="button" onClick={() => setShowCreateModal(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm">Cancel</button>
+                <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm">Create Session</button>
               </div>
             </form>
           </div>
