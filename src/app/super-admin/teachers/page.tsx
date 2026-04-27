@@ -114,10 +114,12 @@ export default function ManageTeachersPage() {
     }
   }
 
-  const fetchAvailableStudents = async () => {
+  const fetchAvailableStudents = async (gradeOverride?: string) => {
+    const gradeToUse = gradeOverride ?? filterGrade
+
     try {
       const students = await SuperAdminService.getStudentsByGradeSection(
-        filterGrade !== 'all' ? filterGrade : undefined,
+        gradeToUse !== 'all' ? gradeToUse : undefined,
         undefined
       )
       setAvailableStudents(students)
@@ -227,7 +229,13 @@ export default function ManageTeachersPage() {
     setSelectedTeacher(teacher)
     const currentStudents = await SuperAdminService.getTeacherStudents(teacher.teacher_id)
     setAssignedStudentIds(new Set(currentStudents.map((s) => s.id)))
-    await fetchAvailableStudents()
+
+    const initialGrade = teacher.grade && teacher.grade !== 'All'
+      ? teacher.grade
+      : 'all'
+
+    setFilterGrade(initialGrade)
+    await fetchAvailableStudents(initialGrade)
     setShowAssignModal(true)
   }
 
@@ -819,8 +827,9 @@ export default function ManageTeachersPage() {
                 <select
                   value={filterGrade}
                   onChange={(e) => {
-                    setFilterGrade(e.target.value)
-                    fetchAvailableStudents()
+                    const selectedGrade = e.target.value
+                    setFilterGrade(selectedGrade)
+                    fetchAvailableStudents(selectedGrade)
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                 >
@@ -832,7 +841,7 @@ export default function ManageTeachersPage() {
               </div>
 
               <button
-                onClick={fetchAvailableStudents}
+                onClick={() => fetchAvailableStudents(filterGrade)}
                 className="w-full py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
               >
                 <RefreshCw className="w-4 h-4" />
