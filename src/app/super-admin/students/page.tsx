@@ -23,7 +23,10 @@ import {
   CheckCircle,
   AlertCircle,
   RefreshCw,
-  Eye
+  Eye,
+  Pencil,
+  MoreVertical,
+  Trash2
 } from 'lucide-react'
 
 interface Student {
@@ -70,9 +73,17 @@ export default function SuperAdminStudentsPage() {
   
   const [showAssignModal, setShowAssignModal] = useState(false)
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
+  const [viewStudent, setViewStudent] = useState<Student | null>(null)
+  const [showViewModal, setShowViewModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editedStudent, setEditedStudent] = useState<Partial<Student>>({})
+  const [savingStudent, setSavingStudent] = useState(false)
+  const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null)
   const [selectedTeacherId, setSelectedTeacherId] = useState('')
   const [assigning, setAssigning] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [studentToDelete, setStudentToDelete] = useState<Student | null>(null)
 
   const itemsPerPage = 10
 
@@ -206,6 +217,59 @@ export default function SuperAdminStudentsPage() {
     }
   }
 
+  const handleViewStudent = (student: Student) => {
+    setViewStudent(student)
+    setShowViewModal(true)
+    setOpenActionMenuId(null)
+  }
+
+  const handleEditClick = (student: Student) => {
+    setSelectedStudent(student)
+    setEditedStudent(student)
+    setShowEditModal(true)
+    setOpenActionMenuId(null)
+  }
+
+  const handleEditSave = async () => {
+    if (!selectedStudent) return
+
+    setSavingStudent(true)
+    try {
+      const { error } = await supabase
+        .from('students')
+        .update({
+          full_name: editedStudent.full_name,
+          email: editedStudent.email,
+          contact_number: editedStudent.contact_number,
+          grade: editedStudent.grade,
+          section: editedStudent.section,
+        })
+        .eq('id', selectedStudent.id)
+
+      if (error) throw error
+
+      setStudents(prev => prev.map(student => (
+        student.id === selectedStudent.id
+          ? { ...student, ...editedStudent } as Student
+          : student
+      )))
+      setFilteredStudents(prev => prev.map(student => (
+        student.id === selectedStudent.id
+          ? { ...student, ...editedStudent } as Student
+          : student
+      )))
+
+      setMessage({ type: 'success', text: 'Student updated successfully' })
+      setShowEditModal(false)
+      setSelectedStudent(null)
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to update student'
+      setMessage({ type: 'error', text: message })
+    } finally {
+      setSavingStudent(false)
+    }
+  }
+
   const handleUnassignStudent = async (studentId: string, studentName: string) => {
     if (!confirm(`Remove ${studentName} from their current teacher?`)) return
 
@@ -224,6 +288,39 @@ export default function SuperAdminStudentsPage() {
       }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Failed to unassign student'
+      setMessage({ type: 'error', text: message })
+    }
+  }
+
+  const handleDeleteClick = (student: Student) => {
+    setStudentToDelete(student)
+    setShowDeleteConfirm(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!studentToDelete) return
+
+    try {
+      const { error: assignmentError } = await supabase
+        .from('student_teacher_assignments')
+        .delete()
+        .eq('student_id', studentToDelete.id)
+
+      if (assignmentError) throw assignmentError
+
+      const { error: studentError } = await supabase
+        .from('students')
+        .delete()
+        .eq('id', studentToDelete.id)
+
+      if (studentError) throw studentError
+
+      setMessage({ type: 'success', text: `Student deleted successfully` })
+      setShowDeleteConfirm(false)
+      setStudentToDelete(null)
+      fetchData()
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to delete student'
       setMessage({ type: 'error', text: message })
     }
   }
@@ -544,27 +641,41 @@ export default function SuperAdminStudentsPage() {
                         )}
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex justify-end gap-2">
-                          {!student.is_assigned ? (
+                        <div className="flex justify-end items-center gap-2 relative">
+                          <div className="relative">
                             <button
-                              onClick={() => {
-                                setSelectedStudent(student)
-                                setShowAssignModal(true)
-                              }}
-                              className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 transition-colors flex items-center gap-1"
+                              onClick={() => setOpenActionMenuId(prev => prev === student.id ? null : student.id)}
+                              className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 transition-colors flex items-center gap-1"
                             >
-                              <UserCheck className="w-3 h-3" />
-                              Assign
+                              <MoreVertical className="w-3 h-3" />
+                              Actions
                             </button>
-                          ) : (
-                            <button
-                              onClick={() => handleUnassignStudent(student.id, student.full_name)}
-                              className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-sm hover:bg-red-200 transition-colors flex items-center gap-1"
-                            >
-                              <UserX className="w-3 h-3" />
-                              Unassign
-                            </button>
-                          )}
+                            {openActionMenuId === student.id && (
+                              <div className="absolute right-0 mt-2 w-40 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-20">
+                                <button
+                                  onClick={() => handleViewStudent(student)}
+                                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                >
+                                  <Eye className="w-4 h-4" />
+                                  View
+                                </button>
+                                <button
+                                  onClick={() => handleEditClick(student)}
+                                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteClick(student)}
+                                  className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                  Delete
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </td>
                     </tr>
@@ -665,6 +776,120 @@ export default function SuperAdminStudentsPage() {
                       Assign
                     </>
                   )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showViewModal && viewStudent && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowViewModal(false)}>
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-start justify-between gap-4 mb-6">
+              <div>
+                <h3 className="text-2xl font-bold text-gray-800">Student Details</h3>
+                <p className="text-sm text-gray-500 mt-1">View student information</p>
+              </div>
+              <button onClick={() => setShowViewModal(false)} className="text-gray-400 hover:text-gray-700">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+              <div><span className="text-gray-500">Name:</span> <span className="font-medium text-gray-800">{viewStudent.full_name}</span></div>
+              <div><span className="text-gray-500">LRN:</span> <span className="font-medium text-gray-800">{viewStudent.lrn}</span></div>
+              <div><span className="text-gray-500">Email:</span> <span className="font-medium text-gray-800">{viewStudent.email || 'N/A'}</span></div>
+              <div><span className="text-gray-500">Contact:</span> <span className="font-medium text-gray-800">{viewStudent.contact_number || 'N/A'}</span></div>
+              <div><span className="text-gray-500">Grade:</span> <span className="font-medium text-gray-800">Grade {viewStudent.grade}</span></div>
+              <div><span className="text-gray-500">Section:</span> <span className="font-medium text-gray-800">{viewStudent.section || 'N/A'}</span></div>
+              <div><span className="text-gray-500">Assigned:</span> <span className="font-medium text-gray-800">{viewStudent.is_assigned ? viewStudent.teacher_name : 'Unassigned'}</span></div>
+              <div><span className="text-gray-500">Status:</span> <span className="font-medium text-gray-800">{viewStudent.is_assigned ? 'Assigned' : 'Unassigned'}</span></div>
+            </div>
+            <div className="mt-6 flex justify-end">
+              <button onClick={() => setShowViewModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEditModal && selectedStudent && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowEditModal(false)}>
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-xl max-h-[90vh] overflow-y-auto" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-start justify-between gap-4 mb-6">
+              <div>
+                <h3 className="text-2xl font-bold text-gray-800">Edit Student</h3>
+                <p className="text-sm text-gray-500 mt-1">Update student details</p>
+              </div>
+              <button onClick={() => setShowEditModal(false)} className="text-gray-400 hover:text-gray-700">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <label className="block text-sm">
+                <span className="text-gray-700 font-medium">Full Name</span>
+                <input value={editedStudent.full_name || ''} onChange={(e) => setEditedStudent(prev => ({ ...prev, full_name: e.target.value }))} className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg" />
+              </label>
+              <label className="block text-sm">
+                <span className="text-gray-700 font-medium">Email</span>
+                <input value={editedStudent.email || ''} onChange={(e) => setEditedStudent(prev => ({ ...prev, email: e.target.value }))} className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg" />
+              </label>
+              <label className="block text-sm">
+                <span className="text-gray-700 font-medium">Contact Number</span>
+                <input value={editedStudent.contact_number || ''} onChange={(e) => setEditedStudent(prev => ({ ...prev, contact_number: e.target.value }))} className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg" />
+              </label>
+              <label className="block text-sm">
+                <span className="text-gray-700 font-medium">Grade</span>
+                <select value={editedStudent.grade || ''} onChange={(e) => setEditedStudent(prev => ({ ...prev, grade: e.target.value }))} className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg bg-white">
+                  <option value="11">Grade 11</option>
+                  <option value="12">Grade 12</option>
+                </select>
+              </label>
+              <label className="block text-sm sm:col-span-2">
+                <span className="text-gray-700 font-medium">Section</span>
+                <input value={editedStudent.section || ''} onChange={(e) => setEditedStudent(prev => ({ ...prev, section: e.target.value }))} className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg" />
+              </label>
+            </div>
+            <div className="mt-6 flex flex-col sm:flex-row gap-3 sm:justify-end">
+              <button onClick={() => setShowEditModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium">
+                Cancel
+              </button>
+              <button onClick={handleEditSave} disabled={savingStudent} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors font-medium flex items-center justify-center gap-2">
+                {savingStudent ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pencil className="w-4 h-4" />}
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeleteConfirm && studentToDelete && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2 className="w-8 h-8 text-red-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-800 mb-2">Delete Student</h3>
+              <p className="text-gray-600 mb-6">
+                Are you sure you want to delete {studentToDelete.full_name}? This action cannot be undone.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={() => {
+                    setShowDeleteConfirm(false)
+                    setStudentToDelete(null)
+                  }}
+                  className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteConfirm}
+                  className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                >
+                  Delete
                 </button>
               </div>
             </div>
