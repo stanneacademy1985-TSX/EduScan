@@ -17,6 +17,9 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [agreedToPolicies, setAgreedToPolicies] = useState(false)
+  const [showPolicyModal, setShowPolicyModal] = useState(false)
+  const [activePolicy, setActivePolicy] = useState<'terms' | 'privacy'>('terms')
   const [isClient, setIsClient] = useState(false)
   const [desktopLogoError, setDesktopLogoError] = useState(false)
   const [mobileLogoError, setMobileLogoError] = useState(false)
@@ -39,6 +42,12 @@ export default function LoginPage() {
 
     if (!formData.email || !formData.password) {
       setError('Please fill in all fields')
+      setLoading(false)
+      return
+    }
+
+    if (!agreedToPolicies) {
+      setError('You must agree to the Terms of Service and Privacy Policy to continue')
       setLoading(false)
       return
     }
@@ -323,6 +332,43 @@ export default function LoginPage() {
             </div>
 
             {/* Continue Button */}
+            <label className="flex items-start gap-2 text-sm text-gray-600">
+              <input
+                type="checkbox"
+                checked={agreedToPolicies}
+                onChange={(e) => {
+                  setAgreedToPolicies(e.target.checked)
+                  setError('')
+                }}
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span>
+                I agree to the{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActivePolicy('terms')
+                    setShowPolicyModal(true)
+                  }}
+                  className="text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  Terms of Service
+                </button>{' '}
+                and{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActivePolicy('privacy')
+                    setShowPolicyModal(true)
+                  }}
+                  className="text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  Privacy Policy
+                </button>
+                .
+              </span>
+            </label>
+
             <button
               type="submit"
               disabled={loading}
@@ -344,17 +390,126 @@ export default function LoginPage() {
             {/* Terms & Privacy */}
             <div className="text-center text-xs text-gray-500 max-w-sm mx-auto pt-2 sm:pt-4">
               <p>
-                By signing in you agree to our{' '}
-                <Link href="/terms" className="text-blue-600 hover:text-blue-800">
+                By continuing, you agree to our{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActivePolicy('terms')
+                    setShowPolicyModal(true)
+                  }}
+                  className="text-blue-600 hover:text-blue-800"
+                >
                   Terms of Service
-                </Link>{' '}
+                </button>{' '}
                 and{' '}
-                <Link href="/privacy" className="text-blue-600 hover:text-blue-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActivePolicy('privacy')
+                    setShowPolicyModal(true)
+                  }}
+                  className="text-blue-600 hover:text-blue-800"
+                >
                   Privacy Policy
-                </Link>
+                </button>
                 . We'll occasionally send you emails about important updates; you can opt-out anytime.
               </p>
             </div>
+
+            {showPolicyModal && (
+              <div
+                className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+                onClick={() => setShowPolicyModal(false)}
+              >
+                <div
+                  className="w-full max-w-2xl bg-white rounded-2xl shadow-xl border border-gray-200"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
+                    <h3 className="text-lg font-bold text-gray-900">
+                      {activePolicy === 'terms' ? 'Terms of Service' : 'Privacy Policy'}
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setShowPolicyModal(false)}
+                      className="text-gray-500 hover:text-gray-700 text-sm"
+                    >
+                      Close
+                    </button>
+                  </div>
+
+                  <div className="px-5 pt-4 pb-2 flex gap-2 border-b border-gray-100">
+                    <button
+                      type="button"
+                      onClick={() => setActivePolicy('terms')}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
+                        activePolicy === 'terms'
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Terms of Service
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActivePolicy('privacy')}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
+                        activePolicy === 'privacy'
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Privacy Policy
+                    </button>
+                  </div>
+
+                  <div className="px-5 py-4 max-h-[60vh] overflow-y-auto text-sm text-gray-700 space-y-3">
+                    {activePolicy === 'terms' ? (
+                      <>
+                        <p>
+                          EduScan must be used only for school-related and attendance-related purposes.
+                          By signing in, you agree to follow school policies and use your account responsibly.
+                        </p>
+                        <p>
+                          You are responsible for keeping your account credentials secure and for all actions performed under your account.
+                        </p>
+                        <p>
+                          Misuse, unauthorized access, or manipulation of attendance data is strictly prohibited.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setActivePolicy('privacy')}
+                          className="text-blue-600 hover:text-blue-800 font-medium"
+                        >
+                          Read Privacy Policy
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <p>
+                          EduScan collects account and attendance information needed for school operations,
+                          monitoring, and official reporting.
+                        </p>
+                        <p>
+                          Data is accessible only to authorized school personnel and is protected through
+                          security controls to reduce unauthorized access.
+                        </p>
+                        <p>
+                          Students may request correction of inaccurate personal data through school administration.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setActivePolicy('terms')}
+                          className="text-blue-600 hover:text-blue-800 font-medium"
+                        >
+                          Read Terms of Service
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Divider */}
             <div className="relative my-8">
