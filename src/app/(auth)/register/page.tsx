@@ -12,7 +12,7 @@ import {
   User, Mail, Lock, BookOpen, Hash, QrCode, ArrowRight, 
   Loader2, Phone, Home, Calendar, Heart, Briefcase, School, 
   UserCircle, Users, Pill, AlertCircle, CheckCircle, Eye, EyeOff,
-  Upload, Camera, X, Shield
+  Upload, Camera, X, Shield, ImageIcon
 } from 'lucide-react'
 
 type RegistrationData = {
@@ -101,6 +101,7 @@ export default function RegisterPage() {
   const [qrGenerating, setQrGenerating] = useState(false)
   const [mobileLogoError, setMobileLogoError] = useState(false)
   const [desktopLogoError, setDesktopLogoError] = useState(false)
+  const [isCompressing, setIsCompressing] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -167,52 +168,144 @@ export default function RegisterPage() {
     return true
   }
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Function to compress image
+  const compressImage = (file: File, maxSizeMB: number = 1): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      
+      reader.onload = (e) => {
+        const img = new window.Image()
+        img.onload = () => {
+          const canvas = document.createElement('canvas')
+          let width = img.width
+          let height = img.height
+          
+          // Calculate new dimensions while maintaining aspect ratio
+          const maxDimension = 1200 // Max width or height
+          if (width > height && width > maxDimension) {
+            height = (height * maxDimension) / width
+            width = maxDimension
+          } else if (height > maxDimension) {
+            width = (width * maxDimension) / height
+            height = maxDimension
+          }
+          
+          canvas.width = width
+          canvas.height = height
+          
+          const ctx = canvas.getContext('2d')
+          if (!ctx) {
+            reject(new Error('Failed to create canvas context'))
+            return
+          }
+          
+          ctx.drawImage(img, 0, 0, width, height)
+          
+          // Try to compress to JPEG with reducing quality until size is under limit
+          let quality = 0.8
+          const tryCompress = () => {
+            canvas.toBlob(
+              (blob) => {
+                if (!blob) {
+                  reject(new Error('Failed to compress image'))
+                  return
+                }
+                
+                const maxSize = maxSizeMB * 1024 * 1024
+                
+                if (blob.size > maxSize && quality > 0.1) {
+                  // Reduce quality and try again
+                  quality -= 0.1
+                  tryCompress()
+                } else if (blob.size > maxSize) {
+                  // If still too big, reduce dimensions
+                  canvas.width = Math.round(width * 0.7)
+                  canvas.height = Math.round(height * 0.7)
+                  ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+                  quality = 0.6
+                  tryCompress()
+                } else {
+                  // Create new file from blob
+                  const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, '.jpg'), {
+                    type: 'image/jpeg',
+                    lastModified: Date.now()
+                  })
+                  resolve(compressedFile)
+                }
+              },
+              'image/jpeg',
+              quality
+            )
+          }
+          
+          tryCompress()
+        }
+        
+        img.onerror = () => reject(new Error('Failed to load image for compression'))
+        img.src = e.target?.result as string
+      }
+      
+      reader.onerror = () => reject(new Error('Failed to read file for compression'))
+      reader.readAsDataURL(file)
+    })
+  }
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
     // Reset error and clear previous state
     setError('')
+    setIsCompressing(true)
     
-    // Validate file type
-    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
-    if (!validTypes.includes(file.type)) {
-      setError('Please upload a valid image file (JPEG, PNG, GIF, WebP)')
-      return
-    }
-
-    // Validate file size (max 2MB for base64)
-    const maxSize = 2 * 1024 * 1024 // 2MB
-    if (file.size > maxSize) {
-      setError('Image size should be less than 2MB for optimal performance')
-      return
-    }
-
-    // Clear any previous preview
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl)
-    }
-
-    // Create preview URL and update form data
     try {
-      const url = URL.createObjectURL(file)
-      setPreviewUrl(url)
-      setFormData(prev => ({ ...prev, profilePhoto: file }))
+      // Validate file type
+      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif']
+      if (!validTypes.includes(file.type) && file.type !== '') {
+        // Some mobile browsers don't send file type, so check extension
+        const extension = file.name.split('.').pop()?.toLowerCase()
+        const validExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif']
+        if (!extension || !validExtensions.includes(extension)) {
+          setError('Please upload a valid image file (JPEG, PNG, GIF, WebP, HEIC)')
+          setIsCompressing(false)
+          return
+        }
+      }
       
-      // Simulate upload progress
-      setUploadProgress(0)
-      const interval = setInterval(() => {
-        setUploadProgress(prev => {
-          if (prev >= 100) {
-            clearInterval(interval)
-            return 100
-          }
-          return prev + 10
-        })
-      }, 50)
+      let processedFile = file
+      
+      // Compress image if larger than 1MB
+      if (file.size > 1 * 1024 * 1024) {
+        try {
+          setUploadProgress(25)
+          processedFile = await compressImage(file, 1)
+          setUploadProgress(75)
+        } catch (compressError) {
+          console.warn('Image compression failed, using original:', compressError)
+          // Continue with original file
+        }
+      }
+      
+      // Clear any previous preview
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl)
+      }
+      
+      // Create preview URL
+      const url = URL.createObjectURL(processedFile)
+      setPreviewUrl(url)
+      setFormData(prev => ({ ...prev, profilePhoto: processedFile }))
+      
+      setUploadProgress(100)
+      setTimeout(() => {
+        setUploadProgress(0)
+        setIsCompressing(false)
+      }, 1000)
+      
     } catch (err) {
       console.error('Error processing image:', err)
       setError('Failed to process image. Please try again.')
+      setIsCompressing(false)
     }
   }
 
@@ -450,21 +543,26 @@ export default function RegisterPage() {
                         <X className="w-4 h-4" />
                       </button>
                     </div>
+                  ) : isCompressing ? (
+                    <div className="w-32 h-32 rounded-full border-2 border-dashed border-blue-300 flex flex-col items-center justify-center bg-blue-50">
+                      <Loader2 className="w-8 h-8 text-blue-500 animate-spin mb-2" />
+                      <span className="text-xs text-blue-600">Processing...</span>
+                    </div>
                   ) : (
-                    <label className="cursor-pointer group">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handlePhotoUpload}
-                        className="hidden"
-                        // Add capture attribute for mobile devices
-                        capture="environment"
-                      />
-                      <div className="w-32 h-32 rounded-full border-2 border-dashed border-gray-300 flex flex-col items-center justify-center bg-gray-50 hover:bg-gray-100 transition-colors group-hover:border-blue-400">
-                        <Camera className="w-10 h-10 text-gray-400 mb-2" />
-                        <span className="text-xs text-gray-500 text-center px-2">Upload Photo</span>
-                      </div>
-                    </label>
+                    <div className="flex gap-2">
+                      <label className="cursor-pointer group flex-1">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handlePhotoUpload}
+                          className="hidden"
+                        />
+                        <div className="w-32 h-32 rounded-full border-2 border-dashed border-gray-300 flex flex-col items-center justify-center bg-gray-50 hover:bg-gray-100 transition-colors group-hover:border-blue-400">
+                          <ImageIcon className="w-10 h-10 text-gray-400 mb-2" />
+                          <span className="text-xs text-gray-500 text-center px-2">Choose Photo</span>
+                        </div>
+                      </label>
+                    </div>
                   )}
                 </div>
 
@@ -472,15 +570,15 @@ export default function RegisterPage() {
                 <div className="flex-1">
                   <div className="space-y-3">
                     <div>
-                      <h4 className="text-sm font-medium text-gray-700 mb-1">Upload Requirements</h4>
+                      <h4 className="text-sm font-medium text-gray-700 mb-1">Photo Requirements</h4>
                       <ul className="text-xs text-gray-500 space-y-1">
                         <li className="flex items-center">
                           <div className="w-1.5 h-1.5 bg-blue-400 rounded-full mr-2"></div>
-                          File types: JPG, PNG, GIF, WebP
+                          Supported: JPG, PNG, GIF, WebP, HEIC
                         </li>
                         <li className="flex items-center">
                           <div className="w-1.5 h-1.5 bg-blue-400 rounded-full mr-2"></div>
-                          Max file size: 2MB
+                          Photos will be automatically compressed
                         </li>
                         <li className="flex items-center">
                           <div className="w-1.5 h-1.5 bg-blue-400 rounded-full mr-2"></div>
@@ -492,12 +590,12 @@ export default function RegisterPage() {
                     {uploadProgress > 0 && uploadProgress < 100 && (
                       <div className="space-y-1">
                         <div className="flex justify-between text-xs text-gray-600">
-                          <span>Processing...</span>
+                          <span>Processing image...</span>
                           <span>{uploadProgress}%</span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-1.5">
                           <div 
-                            className="bg-green-500 h-1.5 rounded-full transition-all duration-300"
+                            className="bg-blue-500 h-1.5 rounded-full transition-all duration-300"
                             style={{ width: `${uploadProgress}%` }}
                           ></div>
                         </div>
@@ -510,28 +608,12 @@ export default function RegisterPage() {
                         Photo ready
                       </div>
                     )}
-
-                    {!previewUrl && (
-                      <div className="pt-2">
-                        <label className="inline-flex items-center px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer text-sm font-medium">
-                          <Upload className="w-4 h-4 mr-2" />
-                          Choose File
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={handlePhotoUpload}
-                            className="hidden"
-                            capture="environment"
-                          />
-                        </label>
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Personal Information Fields */}
+            {/* Rest of the form remains the same */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">First Name *</label>
@@ -623,6 +705,7 @@ export default function RegisterPage() {
           </div>
         )
 
+      // Steps 2-5 remain the same
       case 2:
         return (
           <div className="space-y-5">
@@ -1035,10 +1118,9 @@ export default function RegisterPage() {
           </div>
         </div>
 
-        {/* Desktop Content */}
+        {/* Desktop Content - Same as before */}
         <div className="hidden lg:flex flex-col h-full">
           <div className="shrink-0">
-            {/* Logo Section */}
             <div className="flex items-center space-x-4 mb-8">
               <div className="w-30 h-30 flex items-center justify-center overflow-hidden">
                 {desktopLogoError ? (
@@ -1064,7 +1146,6 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            {/* Welcome Section */}
             <div className="mb-6">
               <h2 className="text-2xl font-bold text-white mb-3">
                 Complete Student{' '}
@@ -1078,7 +1159,6 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          {/* Current Step Highlight */}
           <div className="mt-4 mb-6">
             <div className="bg-white/10 backdrop-blur-sm rounded-xl p-5 border border-white/20">
               <div className="flex items-center space-x-3 mb-3">
@@ -1101,7 +1181,6 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          {/* Progress Steps */}
           <div className="space-y-2 mb-6">
             {steps.map(step => {
               const StepIcon = step.icon
@@ -1130,7 +1209,6 @@ export default function RegisterPage() {
             })}
           </div>
 
-          {/* Footer */}
           <div className="mt-auto pt-4 border-t border-white/20">
             <p className="text-gray-100 text-xs">
               © 2024 EduPortal. All rights reserved.
@@ -1145,7 +1223,6 @@ export default function RegisterPage() {
       {/* Right Panel - Registration Form */}
       <div className="lg:w-1/2 flex-1 p-4 sm:p-5 lg:p-8 flex flex-col">
         <div className="max-w-2xl mx-auto w-full flex-1 flex flex-col">
-          {/* Desktop Header */}
           <div className="hidden lg:block mb-6">
             <h1 className="text-3xl font-bold text-gray-900 mb-2">
               Student Registration
@@ -1155,7 +1232,6 @@ export default function RegisterPage() {
             </p>
           </div>
 
-          {/* Status Messages */}
           {error && (
             <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
               <div className="flex items-center">
@@ -1182,7 +1258,6 @@ export default function RegisterPage() {
             </div>
           )}
 
-          {/* QR Generation Status */}
           {qrGenerating && (
             <div className="mb-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
               <div className="flex items-center">
@@ -1194,7 +1269,6 @@ export default function RegisterPage() {
             </div>
           )}
 
-          {/* Registration Form */}
           <div className="flex-1 flex flex-col">
             <form 
               onSubmit={currentStep === 5 ? handleSubmit : (e) => { e.preventDefault(); nextStep(); }}
@@ -1204,7 +1278,6 @@ export default function RegisterPage() {
                 {renderStep()}
               </div>
 
-              {/* Navigation Buttons */}
               <div className="flex flex-col-reverse sm:flex-row gap-3 sm:gap-0 sm:justify-between mt-auto">
                 <button
                   type="button"
@@ -1246,7 +1319,6 @@ export default function RegisterPage() {
               </div>
             </form>
 
-            {/* Terms & Privacy */}
             <div className="text-center text-sm text-gray-500 mt-6 pt-6 border-t border-gray-200">
               <p>
                 By creating an account you agree to our{' '}
@@ -1261,7 +1333,6 @@ export default function RegisterPage() {
               </p>
             </div>
 
-            {/* Login Link */}
             <div className="relative my-6">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-gray-300"></div>
@@ -1281,7 +1352,6 @@ export default function RegisterPage() {
               </Link>
             </div>
 
-            {/* Mobile Back to home */}
             <div className="lg:hidden mt-6 pt-6 border-t border-gray-200">
               <Link
                 href="/"
