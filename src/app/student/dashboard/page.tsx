@@ -411,13 +411,13 @@ export default function StudentDashboard() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'present':
-        return <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+        return <CheckCircle className="w-4 h-4 text-green-500" />
       case 'late':
-        return <ClockIcon className="w-4 h-4 text-amber-500 flex-shrink-0" />
+        return <ClockIcon className="w-4 h-4 text-amber-500" />
       case 'absent':
-        return <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+        return <XCircle className="w-4 h-4 text-red-500" />
       default:
-        return <CheckCircle className="w-4 h-4 text-gray-400 flex-shrink-0" />
+        return <CheckCircle className="w-4 h-4 text-gray-400" />
     }
   }
 
@@ -475,7 +475,7 @@ export default function StudentDashboard() {
               </div>
               
               <div className="bg-white px-4 py-2 rounded-xl border border-gray-200 shadow-sm inline-flex items-center self-start sm:self-center">
-                <Calendar className="w-4 h-4 text-blue-600 mr-2 flex-shrink-0" />
+                <Calendar className="w-4 h-4 text-blue-600 mr-2" />
                 <p className="text-xs sm:text-sm font-medium text-gray-700">
                   {new Date().toLocaleDateString('en-US', { 
                     weekday: 'short', 
@@ -487,12 +487,12 @@ export default function StudentDashboard() {
               </div>
             </div>
 
-            {/* Profile & QR Section - Responsive Stack */}
+            {/* Profile & QR Section */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Student Information Card */}
-              <div className="lg:col-span-2 bg-white rounded-2xl shadow-lg border border-gray-200 p-5 sm:p-6 md:p-7">
+              <div className="lg:col-span-2 bg-white rounded-2xl shadow-lg border border-gray-200 p-5 sm:p-6">
                 <div className="flex items-center gap-3 mb-6">
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center flex-shrink-0">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center">
                     <User className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
                   </div>
                   <div>
@@ -501,80 +501,50 @@ export default function StudentDashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-                  <div className="space-y-4 sm:space-y-5">
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                        <Hash className="w-4 h-4 text-gray-600" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">LRN</p>
-                        <p className="font-mono font-bold text-gray-900 text-sm sm:text-base lg:text-lg break-all">{student?.lrn}</p>
-                      </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">LRN</p>
+                      <p className="font-mono font-bold text-gray-900 text-sm sm:text-base break-all">{student?.lrn}</p>
                     </div>
                     
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                        <User className="w-4 h-4 text-gray-600" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Full Name</p>
-                        <p className="font-bold text-gray-900 text-sm sm:text-base lg:text-lg break-words">{student?.full_name}</p>
-                      </div>
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Full Name</p>
+                      <p className="font-bold text-gray-900 text-sm sm:text-base break-words">{student?.full_name}</p>
                     </div>
 
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                        <Mail className="w-4 h-4 text-gray-600" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Email</p>
-                        <p className="text-xs sm:text-sm text-gray-900 break-all font-medium">{student?.email}</p>
-                      </div>
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Email</p>
+                      <p className="text-xs sm:text-sm text-gray-900 break-all">{student?.email}</p>
                     </div>
                   </div>
 
-                  <div className="space-y-4 sm:space-y-5">
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                        <Phone className="w-4 h-4 text-gray-600" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</p>
-                        <p className="font-bold text-gray-900 text-sm sm:text-base lg:text-lg break-all">{student?.contact_number}</p>
-                      </div>
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</p>
+                      <p className="font-bold text-gray-900 text-sm sm:text-base">{student?.contact_number}</p>
                     </div>
 
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                        <GraduationCap className="w-4 h-4 text-gray-600" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Grade & Section</p>
-                        <p className="font-bold text-gray-900 text-sm sm:text-base lg:text-lg break-words">Grade {student?.grade} - {student?.section}</p>
-                      </div>
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Grade & Section</p>
+                      <p className="font-bold text-gray-900 text-sm sm:text-base">Grade {student?.grade} - {student?.section}</p>
                     </div>
 
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                        <Heart className="w-4 h-4 text-gray-600" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Emergency</p>
-                        <p className="font-bold text-gray-900 text-sm sm:text-base lg:text-lg break-all">{student?.emergency_contact}</p>
-                      </div>
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Emergency</p>
+                      <p className="font-bold text-gray-900 text-sm sm:text-base">{student?.emergency_contact}</p>
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* QR Code Card */}
-              <div className="bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl shadow-lg p-5 sm:p-6 md:p-7 relative overflow-hidden">
+              <div className="bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl shadow-lg p-5 sm:p-6 relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-32 sm:w-40 h-32 sm:h-40 bg-white/10 rounded-full -mr-12 -mt-12"></div>
                 <div className="absolute bottom-0 left-0 w-28 sm:w-32 h-28 sm:h-32 bg-white/10 rounded-full -ml-10 -mb-10"></div>
                 
                 <div className="relative">
-                  <div className="flex items-center gap-3 mb-4 sm:mb-5">
+                  <div className="flex items-center gap-3 mb-4">
                     <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-sm">
                       <QrCode className="w-5 h-5 text-white" />
                     </div>
@@ -585,8 +555,8 @@ export default function StudentDashboard() {
                   </div>
 
                   <div className="flex flex-col items-center">
-                    <div className="relative mb-4 sm:mb-5">
-                      <div className="w-20 h-20 rounded-full border-3 border-white/50 overflow-hidden shadow-lg">
+                    <div className="relative mb-4">
+                      <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-3 border-white/50 overflow-hidden shadow-lg">
                         {renderProfilePhoto('lg')}
                       </div>
                       <div className="absolute bottom-0 right-0 w-4 h-4 sm:w-5 sm:h-5 bg-green-400 border-2 border-white rounded-full"></div>
@@ -600,15 +570,15 @@ export default function StudentDashboard() {
                             alt="Student QR Code"
                             className="w-32 h-32 sm:w-36 sm:h-36 md:w-40 md:h-40 bg-white rounded-xl shadow-lg p-2"
                           />
-                          <div className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 w-6 h-6 sm:w-7 sm:h-7 bg-white rounded-full flex items-center justify-center shadow-lg">
-                            <Shield className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-purple-600" />
+                          <div className="absolute -top-1 -right-1 w-6 h-6 bg-white rounded-full flex items-center justify-center shadow-lg">
+                            <Shield className="w-3 h-3 text-purple-600" />
                           </div>
                         </div>
                         
                         <div className="w-full space-y-2">
                           <button
                             onClick={handleDownloadQR}
-                            className="w-full flex items-center justify-center gap-2 py-2.5 sm:py-3 px-4 bg-white text-blue-600 font-semibold rounded-xl hover:bg-gray-100 transition-colors shadow-md text-xs sm:text-sm"
+                            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-white text-blue-600 font-semibold rounded-xl hover:bg-gray-100 transition-colors shadow-md text-sm"
                           >
                             <Download className="w-4 h-4" />
                             Download QR Code
@@ -623,7 +593,7 @@ export default function StudentDashboard() {
                       </>
                     ) : (
                       <div className="text-center text-white">
-                        <div className="w-10 h-10 sm:w-12 sm:h-12 border-4 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-3"></div>
+                        <div className="w-10 h-10 border-4 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-3"></div>
                         <p className="text-xs sm:text-sm">Generating your secure QR code...</p>
                       </div>
                     )}
@@ -632,22 +602,22 @@ export default function StudentDashboard() {
               </div>
             </div>
 
-            {/* Recent Attendance Section */}
+            {/* Recent Attendance - Mobile Card View */}
             <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
               <div className="p-4 sm:p-5 border-b border-gray-200">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center flex-shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center">
                       <Calendar className="w-5 h-5 text-blue-600" />
                     </div>
                     <div>
                       <h2 className="text-lg sm:text-xl font-bold text-gray-800">Recent Attendance</h2>
-                      <p className="text-gray-500 text-xs">Your latest 5 records</p>
+                      <p className="text-gray-500 text-xs">Your latest records</p>
                     </div>
                   </div>
                   <button 
                     onClick={() => setActiveTab('history')}
-                    className="flex items-center justify-center gap-2 px-3 py-2 sm:px-4 sm:py-2 text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors font-medium text-xs sm:text-sm w-full sm:w-auto"
+                    className="flex items-center justify-center gap-2 px-3 py-2 text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors font-medium text-sm w-full sm:w-auto"
                   >
                     <BarChart className="w-4 h-4" />
                     View Full History
@@ -658,26 +628,20 @@ export default function StudentDashboard() {
               {attendance.length === 0 ? (
                 <div className="p-8 sm:p-12 text-center">
                   <div className="w-14 h-14 sm:w-16 sm:h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                    <Calendar className="w-6 h-6 sm:w-7 sm:h-7 text-gray-400" />
+                    <Calendar className="w-6 h-6 text-gray-400" />
                   </div>
-                  <h3 className="text-base sm:text-lg font-semibold text-gray-700 mb-1">No attendance records yet</h3>
-                  <p className="text-xs sm:text-sm text-gray-500">Records will appear after your first scan</p>
+                  <h3 className="text-base font-semibold text-gray-700 mb-1">No attendance records yet</h3>
+                  <p className="text-sm text-gray-500">Records will appear after your first scan</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[500px]">
-                    <thead>
-                      <tr className="bg-gray-50">
-                        <th className="py-3 px-3 sm:px-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
-                        <th className="py-3 px-3 sm:px-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Time</th>
-                        <th className="py-3 px-3 sm:px-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Teacher</th>
-                        <th className="py-3 px-3 sm:px-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {attendance.slice(0, 5).map((record) => (
-                        <tr key={record.id} className="hover:bg-gray-50/50">
-                          <td className="py-3 px-3 sm:px-4 whitespace-nowrap">
+                <div className="divide-y divide-gray-200">
+                  {/* Mobile Card View - Visible on mobile */}
+                  <div className="block md:hidden">
+                    {attendance.slice(0, 5).map((record) => (
+                      <div key={record.id} className="p-4 space-y-2 hover:bg-gray-50">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="w-4 h-4 text-gray-400" />
                             <span className="text-sm font-medium text-gray-900">
                               {new Date(record.date).toLocaleDateString('en-US', { 
                                 month: 'short', 
@@ -685,30 +649,71 @@ export default function StudentDashboard() {
                                 year: 'numeric'
                               })}
                             </span>
-                          </td>
-                          <td className="py-3 px-3 sm:px-4 whitespace-nowrap">
-                            <div className="flex items-center gap-2">
-                              <Clock className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                          </div>
+                          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(record.status)}`}>
+                            {getStatusIcon(record.status)}
+                            <span className="capitalize">{record.status}</span>
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-gray-400" />
+                          <span className="text-sm font-medium text-gray-900">{formatTime(record.time_in)}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <UserCircle className="w-4 h-4 text-gray-400" />
+                          <span className="text-sm text-gray-600 break-words">{record.teacher_name || 'Unknown'}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Desktop Table View - Hidden on mobile */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-gray-50">
+                          <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
+                          <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Time</th>
+                          <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Teacher</th>
+                          <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                         </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {attendance.slice(0, 5).map((record) => (
+                          <tr key={record.id} className="hover:bg-gray-50/50">
+                            <td className="py-3 px-5 whitespace-nowrap">
                               <span className="text-sm font-medium text-gray-900">
-                                {formatTime(record.time_in)}
+                                {new Date(record.date).toLocaleDateString('en-US', { 
+                                  month: 'short', 
+                                  day: 'numeric',
+                                  year: 'numeric'
+                                })}
                               </span>
-                            </div>
-                          </td>
-                          <td className="py-3 px-3 sm:px-4 whitespace-nowrap">
-                            <span className="text-sm text-gray-600">
-                              {record.teacher_name || 'Unknown'}
-                            </span>
-                          </td>
-                          <td className="py-3 px-3 sm:px-4 whitespace-nowrap">
-                            <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(record.status)}`}>
-                              {getStatusIcon(record.status)}
-                              <span className="capitalize">{record.status}</span>
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                             </td>
+                            <td className="py-3 px-5 whitespace-nowrap">
+                              <div className="flex items-center gap-2">
+                                <Clock className="w-4 h-4 text-gray-400" />
+                                <span className="text-sm font-medium text-gray-900">
+                                  {formatTime(record.time_in)}
+                                </span>
+                              </div>
+                             </td>
+                            <td className="py-3 px-5">
+                              <span className="text-sm text-gray-600">
+                                {record.teacher_name || 'Unknown'}
+                              </span>
+                             </td>
+                            <td className="py-3 px-5 whitespace-nowrap">
+                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusColor(record.status)}`}>
+                                {getStatusIcon(record.status)}
+                                {record.status}
+                              </span>
+                             </td>
+                           </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </div>
@@ -718,7 +723,7 @@ export default function StudentDashboard() {
       case 'profile':
         return (
           <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
-            {/* Profile Header - Responsive */}
+            {/* Profile Header */}
             <div className="relative px-4 sm:px-6 md:px-8 py-5 sm:py-6 bg-gradient-to-r from-indigo-900 via-purple-900 to-pink-900 overflow-hidden">
               <div className="absolute inset-0 opacity-10">
                 <div className="absolute -top-24 -right-24 w-48 sm:w-64 h-48 sm:h-64 bg-white rounded-full blur-3xl"></div>
@@ -757,7 +762,6 @@ export default function StudentDashboard() {
               </div>
             </div>
 
-            {/* Message Alert - Responsive */}
             {message.text && (
               <div className={`mx-4 sm:mx-6 md:mx-8 mt-4 sm:mt-6 p-3 sm:p-4 rounded-xl ${
                 message.type === 'success' 
@@ -766,16 +770,15 @@ export default function StudentDashboard() {
               }`}>
                 <div className="flex items-center gap-3">
                   {message.type === 'success' ? (
-                    <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                    <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5" />
                   ) : (
-                    <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                    <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5" />
                   )}
                   <p className="text-xs sm:text-sm font-medium">{message.text}</p>
                 </div>
               </div>
             )}
 
-            {/* Edit Profile Photo Section */}
             {isEditing && (
               <div className="mx-4 sm:mx-6 md:mx-8 mt-4 sm:mt-6 p-4 sm:p-6 bg-gradient-to-r from-indigo-50/50 via-purple-50/50 to-pink-50/50 rounded-xl border border-gray-200">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
@@ -835,8 +838,7 @@ export default function StudentDashboard() {
                           className="flex items-center justify-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-white hover:bg-gray-50 text-red-600 rounded-xl transition-all duration-200 text-xs sm:text-sm font-medium border border-gray-300 shadow-sm hover:shadow-md"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
-                          Remove
-                        </button>
+                          Remove                        </button>
                       )}
                     </div>
                     <p className="text-xs text-gray-500 mt-2">
@@ -847,11 +849,9 @@ export default function StudentDashboard() {
               </div>
             )}
 
-            {/* Profile Content */}
             <div className="p-4 sm:p-6 md:p-8">
               {!isEditing ? (
                 <div className="space-y-6 sm:space-y-8">
-                  {/* Personal Information */}
                   <div>
                     <h3 className="text-base sm:text-lg font-semibold text-gray-800 pb-2 border-b border-gray-200 flex items-center gap-2">
                       <User className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600" />
@@ -872,7 +872,7 @@ export default function StudentDashboard() {
                       </div>
                       <div>
                         <p className="text-xs font-medium text-gray-500 uppercase">Contact Number</p>
-                        <p className="text-sm sm:text-base font-semibold text-gray-900 mt-1 break-all">{student?.contact_number}</p>
+                        <p className="text-sm sm:text-base font-semibold text-gray-900 mt-1">{student?.contact_number}</p>
                       </div>
                       <div>
                         <p className="text-xs font-medium text-gray-500 uppercase">Date of Birth</p>
@@ -895,7 +895,6 @@ export default function StudentDashboard() {
                     </div>
                   </div>
 
-                  {/* Academic Information */}
                   <div>
                     <h3 className="text-base sm:text-lg font-semibold text-gray-800 pb-2 border-b border-gray-200 flex items-center gap-2">
                       <GraduationCap className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" />
@@ -929,7 +928,6 @@ export default function StudentDashboard() {
                     </div>
                   </div>
 
-                  {/* Parents & Guardian */}
                   {(student?.father_name || student?.mother_name || student?.guardian_name) && (
                     <div>
                       <h3 className="text-base sm:text-lg font-semibold text-gray-800 pb-2 border-b border-gray-200 flex items-center gap-2">
@@ -968,7 +966,6 @@ export default function StudentDashboard() {
                     </div>
                   )}
 
-                  {/* Medical Information */}
                   {(student?.medical_conditions || student?.medications || student?.allergies) && (
                     <div>
                       <h3 className="text-base sm:text-lg font-semibold text-gray-800 pb-2 border-b border-gray-200 flex items-center gap-2">
@@ -998,7 +995,6 @@ export default function StudentDashboard() {
                     </div>
                   )}
 
-                  {/* Emergency Contact */}
                   <div>
                     <h3 className="text-base sm:text-lg font-semibold text-gray-800 pb-2 border-b border-gray-200 flex items-center gap-2">
                       <Phone className="w-4 h-4 sm:w-5 sm:h-5 text-rose-600" />
@@ -1006,13 +1002,12 @@ export default function StudentDashboard() {
                     </h3>
                     <div className="mt-4">
                       <p className="text-xs font-medium text-gray-500 uppercase">Emergency Contact Number</p>
-                      <p className="text-sm sm:text-base font-semibold text-gray-900 mt-1 break-all">{student?.emergency_contact}</p>
+                      <p className="text-sm sm:text-base font-semibold text-gray-900 mt-1">{student?.emergency_contact}</p>
                     </div>
                   </div>
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {/* Tabs */}
                   <div className="flex gap-1 sm:gap-2 overflow-x-auto pb-2 border-b border-gray-200">
                     {[
                       { id: 'personal', label: 'Personal Info', icon: User },
@@ -1041,7 +1036,6 @@ export default function StudentDashboard() {
                     })}
                   </div>
 
-                  {/* Form Sections */}
                   {editTab === 'personal' && (
                     <div className="space-y-6">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
@@ -1428,7 +1422,6 @@ export default function StudentDashboard() {
                     </div>
                   )}
 
-                  {/* Action Buttons */}
                   <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-6 border-t border-gray-200">
                     <button
                       onClick={handleEditToggle}
@@ -1480,7 +1473,6 @@ export default function StudentDashboard() {
                     </div>
                   </div>
                   
-                  {/* Security Badge */}
                   <div className="bg-green-500/20 backdrop-blur-sm px-2 py-1 sm:px-3 rounded-full flex items-center gap-1 border border-green-400/30 w-fit">
                     <Shield className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-green-300" />
                     <span className="text-[10px] sm:text-xs text-green-300">Encrypted</span>
@@ -1518,7 +1510,7 @@ export default function StudentDashboard() {
                         </button>
                       </div>
                       
-                      <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-blue-800/30 backdrop-blur-sm rounded-xl border border-white/20 max-w-lg">
+                      <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-blue-800/30 backdrop-blur-sm rounded-xl border border-white/20">
                         <p className="text-[10px] sm:text-xs text-white text-center leading-relaxed">
                           <span className="font-bold text-green-300">🔐 Permanently Encrypted QR Code</span><br />
                           <span className="hidden sm:inline">Your QR code is encrypted with AES-256 and will never expire. Only authorized scanners can read it.</span>
@@ -1542,7 +1534,6 @@ export default function StudentDashboard() {
         return (
           <div className="space-y-4 sm:space-y-6">
             <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
-              {/* Header */}
               <div className="p-4 sm:p-6 border-b border-gray-200 bg-gradient-to-r from-blue-600 to-purple-600">
                 <div className="flex items-center gap-3 sm:gap-4">
                   <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
@@ -1555,56 +1546,93 @@ export default function StudentDashboard() {
                 </div>
               </div>
 
-              {/* Teacher Performance Summary - Responsive Table */}
+              {/* Teacher Performance Summary - Mobile Card View */}
               {Object.keys(teacherStats).length > 0 && (
                 <div className="p-4 sm:p-6 border-b border-gray-200">
                   <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-3 sm:mb-4">Teacher Performance Summary</h3>
-                  <div className="overflow-x-auto">
+                  
+                  {/* Mobile Card View */}
+                  <div className="block md:hidden space-y-3">
+                    {Object.values(teacherStats).map((stat, index) => (
+                      <div key={index} className="bg-gray-50 rounded-xl p-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <UserCircle className="w-5 h-5 text-gray-500" />
+                            <span className="font-semibold text-gray-900">{stat.teacherName}</span>
+                          </div>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            stat.rate >= 90 ? 'bg-green-100 text-green-700' :
+                            stat.rate >= 75 ? 'bg-yellow-100 text-yellow-700' :
+                            'bg-red-100 text-red-700'
+                          }`}>
+                            {stat.rate}%
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 text-center">
+                          <div className="bg-white rounded-lg p-2">
+                            <p className="text-xs text-gray-500">Sessions</p>
+                            <p className="font-bold text-gray-900">{stat.total}</p>
+                          </div>
+                          <div className="bg-white rounded-lg p-2">
+                            <p className="text-xs text-gray-500">Present</p>
+                            <p className="font-bold text-green-600">{stat.present}</p>
+                          </div>
+                          <div className="bg-white rounded-lg p-2">
+                            <p className="text-xs text-gray-500">Late</p>
+                            <p className="font-bold text-yellow-600">{stat.late}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Desktop Table View */}
+                  <div className="hidden md:block overflow-x-auto">
                     <table className="w-full min-w-[500px]">
                       <thead className="bg-gray-50">
                         <tr>
-                          <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Teacher</th>
-                          <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Sessions</th>
-                          <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Present</th>
-                          <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Late</th>
-                          <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Absent</th>
-                          <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Rate</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Teacher</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Sessions</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Present</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Late</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Absent</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Rate</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
                         {Object.values(teacherStats).map((stat, index) => (
                           <tr key={index} className="hover:bg-gray-50">
-                            <td className="px-3 sm:px-4 py-2 sm:py-3">
+                            <td className="px-4 py-3">
                               <div className="flex items-center gap-2">
-                                <UserCircle className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 flex-shrink-0" />
-                                <span className="font-medium text-gray-900 text-xs sm:text-sm break-words">{stat.teacherName}</span>
+                                <UserCircle className="w-5 h-5 text-gray-400" />
+                                <span className="font-medium text-gray-900">{stat.teacherName}</span>
                               </div>
                             </td>
-                            <td className="px-3 sm:px-4 py-2 sm:py-3 font-medium text-gray-900 text-xs sm:text-sm">{stat.total}</td>
-                            <td className="px-3 sm:px-4 py-2 sm:py-3">
-                              <span className="px-2 sm:px-3 py-0.5 sm:py-1 bg-green-100 text-green-700 rounded-full text-[10px] sm:text-xs font-medium">
+                            <td className="px-4 py-3 font-medium text-gray-900">{stat.total}</td>
+                            <td className="px-4 py-3">
+                              <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
                                 {stat.present}
                               </span>
                             </td>
-                            <td className="px-3 sm:px-4 py-2 sm:py-3">
-                              <span className="px-2 sm:px-3 py-0.5 sm:py-1 bg-yellow-100 text-yellow-700 rounded-full text-[10px] sm:text-xs font-medium">
+                            <td className="px-4 py-3">
+                              <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">
                                 {stat.late}
                               </span>
-                             </td>
-                            <td className="px-3 sm:px-4 py-2 sm:py-3">
-                              <span className="px-2 sm:px-3 py-0.5 sm:py-1 bg-red-100 text-red-700 rounded-full text-[10px] sm:text-xs font-medium">
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium">
                                 {stat.absent}
                               </span>
-                             </td>
-                            <td className="px-3 sm:px-4 py-2 sm:py-3">
-                              <span className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium ${
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                                 stat.rate >= 90 ? 'bg-green-100 text-green-700' :
                                 stat.rate >= 75 ? 'bg-yellow-100 text-yellow-700' :
                                 'bg-red-100 text-red-700'
                               }`}>
                                 {stat.rate}%
                               </span>
-                             </td>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -1625,61 +1653,99 @@ export default function StudentDashboard() {
                     <p className="text-xs sm:text-sm text-gray-500">Your attendance history will appear here after your first scan</p>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[600px]">
-                      <thead>
-                        <tr className="bg-gray-50">
-                          <th className="py-2 sm:py-3 px-3 sm:px-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
-                          <th className="py-2 sm:py-3 px-3 sm:px-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Time In</th>
-                          <th className="py-2 sm:py-3 px-3 sm:px-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Teacher</th>
-                          <th className="py-2 sm:py-3 px-3 sm:px-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                          <th className="py-2 sm:py-3 px-3 sm:px-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Day</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {attendance.map((record) => (
-                          <tr key={record.id} className="hover:bg-gray-50/50">
-                            <td className="py-2 sm:py-3 px-3 sm:px-4 whitespace-nowrap">
-                              <span className="text-xs sm:text-sm font-medium text-gray-900">
+                  <>
+                    {/* Mobile Card View for Attendance History */}
+                    <div className="block md:hidden space-y-3">
+                      {attendance.map((record) => (
+                        <div key={record.id} className="bg-gray-50 rounded-xl p-4 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Calendar className="w-4 h-4 text-gray-500" />
+                              <span className="font-medium text-gray-900 text-sm">
                                 {new Date(record.date).toLocaleDateString('en-US', { 
                                   month: 'short', 
                                   day: 'numeric', 
                                   year: 'numeric' 
                                 })}
                               </span>
-                             </td>
-                            <td className="py-2 sm:py-3 px-3 sm:px-4 whitespace-nowrap">
-                              <div className="flex items-center gap-1 sm:gap-2">
-                                <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 flex-shrink-0" />
-                                <span className="text-xs sm:text-sm font-medium text-gray-900">
-                                  {formatTime(record.time_in)}
+                            </div>
+                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(record.status)}`}>
+                              {getStatusIcon(record.status)}
+                              <span className="capitalize">{record.status}</span>
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Clock className="w-4 h-4 text-gray-500" />
+                            <span className="text-sm text-gray-700">{formatTime(record.time_in)}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <UserCircle className="w-4 h-4 text-gray-500" />
+                            <span className="text-sm text-gray-700 break-words">{record.teacher_name || 'Unknown'}</span>
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {new Date(record.date).toLocaleDateString('en-US', { weekday: 'long' })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Desktop Table View */}
+                    <div className="hidden md:block overflow-x-auto">
+                      <table className="w-full min-w-[600px]">
+                        <thead>
+                          <tr className="bg-gray-50">
+                            <th className="py-3 px-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
+                            <th className="py-3 px-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Time In</th>
+                            <th className="py-3 px-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Teacher</th>
+                            <th className="py-3 px-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                            <th className="py-3 px-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Day</th>
+                           </>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {attendance.map((record) => (
+                            <tr key={record.id} className="hover:bg-gray-50/50">
+                              <td className="py-3 px-4 whitespace-nowrap">
+                                <span className="text-sm font-medium text-gray-900">
+                                  {new Date(record.date).toLocaleDateString('en-US', { 
+                                    month: 'short', 
+                                    day: 'numeric', 
+                                    year: 'numeric' 
+                                  })}
                                 </span>
-                              </div>
-                             </td>
-                            <td className="py-2 sm:py-3 px-3 sm:px-4">
-                              <div className="flex items-center gap-1 sm:gap-2">
-                                <UserCircle className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 flex-shrink-0" />
-                                <span className="text-xs sm:text-sm text-gray-600 break-words">
-                                  {record.teacher_name || 'Unknown'}
+                              </td>
+                              <td className="py-3 px-4 whitespace-nowrap">
+                                <div className="flex items-center gap-2">
+                                  <Clock className="w-4 h-4 text-gray-400" />
+                                  <span className="text-sm font-medium text-gray-900">
+                                    {formatTime(record.time_in)}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="py-3 px-4">
+                                <div className="flex items-center gap-2">
+                                  <UserCircle className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                                  <span className="text-sm text-gray-600 break-words">
+                                    {record.teacher_name || 'Unknown'}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="py-3 px-4 whitespace-nowrap">
+                                <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(record.status)}`}>
+                                  {getStatusIcon(record.status)}
+                                  {record.status}
                                 </span>
-                              </div>
-                             </td>
-                            <td className="py-2 sm:py-3 px-3 sm:px-4 whitespace-nowrap">
-                              <span className={`inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium border ${getStatusColor(record.status)}`}>
-                                {getStatusIcon(record.status)}
-                                <span className="capitalize">{record.status}</span>
-                              </span>
-                             </td>
-                            <td className="py-2 sm:py-3 px-3 sm:px-4 whitespace-nowrap">
-                              <span className="text-xs sm:text-sm text-gray-600">
-                                {new Date(record.date).toLocaleDateString('en-US', { weekday: 'long' })}
-                              </span>
-                             </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                              </td>
+                              <td className="py-3 px-4 whitespace-nowrap">
+                                <span className="text-sm text-gray-600">
+                                  {new Date(record.date).toLocaleDateString('en-US', { weekday: 'long' })}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      没有人
+                    </div>
+                  </>
                 )}
               </div>
             </div>
