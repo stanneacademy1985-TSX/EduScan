@@ -227,10 +227,12 @@ export default function QRScannerPage() {
         query = query.eq('teacher_id', adminContext.id)
       }
 
-      if (hasAssignedScope(adminContext)) {
-        query = query
-          .eq('grade', adminContext!.assigned_grade!)
-          .eq('section', adminContext!.assigned_section!)
+      if (hasAssignedScope(adminContext) && adminContext?.assigned_grade) {
+        query = query.eq('grade', adminContext.assigned_grade)
+
+        if (adminContext.assigned_section) {
+          query = query.eq('section', adminContext.assigned_section)
+        }
       }
 
       const { data, error } = await query
@@ -303,12 +305,23 @@ export default function QRScannerPage() {
     try {
       const today = new Date().toISOString().split('T')[0]
       const gradeVariants = buildGradeVariants(selectedSessionDetails.grade)
+      const assignedStudentIds = await getAssignedStudentIds(admin)
+
+      if (assignedStudentIds !== null && assignedStudentIds.length === 0) {
+        setSectionStudents([])
+        setStudentAttendanceStatus({})
+        return
+      }
 
       let query = supabase
         .from('students')
         .select('id, lrn, full_name, grade, section, profile_photo_base64')
         .in('grade', gradeVariants)
         .order('full_name', { ascending: true })
+
+      if (assignedStudentIds !== null) {
+        query = query.in('id', assignedStudentIds)
+      }
 
       const { data: students, error: studentError } = await query
 
