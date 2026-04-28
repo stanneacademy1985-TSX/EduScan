@@ -70,7 +70,7 @@ export default function HomePage() {
           <div className="text-center">
             {/* Main heading */}
             <h1 className="text-4xl max-[360px]:text-3xl sm:text-6xl lg:text-7xl font-bold tracking-tight leading-tight mb-6">
-              <span className="block text-gray-800">IoT-Based</span>
+              <span className="block text-gray-800">St. Anne's Academy</span>
               <span className="block bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                 QR Attendance System
               </span>
