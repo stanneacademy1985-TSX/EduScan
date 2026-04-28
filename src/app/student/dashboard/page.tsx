@@ -52,15 +52,22 @@ import {
 } from 'lucide-react'
 import { generateEncryptedQRCode } from '../../../../lib/qr-generator'
 
-// Extend Attendance type to include teacher_name
+// Extend Attendance type to include teacher_name and session_description
 interface ExtendedAttendance extends Attendance {
   teacher_name?: string
   teacher_id?: string
+  session_description?: string
+  session_date?: string
 }
 
 export default function StudentDashboard() {
   const [student, setStudent] = useState<Student | null>(null)
   const [attendance, setAttendance] = useState<ExtendedAttendance[]>([])
+  const [selectedSessionDescription, setSelectedSessionDescription] = useState<{
+    date: string
+    teacherName: string
+    description: string
+  } | null>(null)
   const [teacherStats, setTeacherStats] = useState<{[key: string]: {
     teacherName: string,
     total: number,
@@ -98,6 +105,53 @@ export default function StudentDashboard() {
       return time
     }
   }
+
+  const openSessionDescription = (record: ExtendedAttendance) => {
+    if (!record.session_description) return
+
+    setSelectedSessionDescription({
+      date: record.date,
+      teacherName: record.teacher_name || 'Unknown',
+      description: record.session_description
+    })
+  }
+
+  const closeSessionDescription = () => {
+    setSelectedSessionDescription(null)
+  }
+
+  const getSessionDescriptionPreview = (description: string, maxLength = 96) => {
+    if (!description) return ''
+    return description.length > maxLength ? `${description.slice(0, maxLength).trim()}...` : description
+  }
+
+  const formatSessionDate = (date: string) => {
+    if (!date) return 'Unknown date'
+
+    try {
+      return new Date(date).toLocaleDateString('en-US', {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric'
+      })
+    } catch {
+      return date
+    }
+  }
+
+  useEffect(() => {
+    if (!selectedSessionDescription) return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closeSessionDescription()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedSessionDescription])
 
   useEffect(() => {
     setIsClient(true)
@@ -140,6 +194,7 @@ export default function StudentDashboard() {
         generateInitialQRCode(studentData.id, studentData.lrn)
       }
 
+      // Fetch attendance with session details including session_description
       const { data: attendanceData, error: attendanceError } = await supabase
         .from('attendance')
         .select(`
@@ -151,11 +206,50 @@ export default function StudentDashboard() {
         .eq('student_id', studentLocal.id)
         .order('date', { ascending: false })
 
+      if (attendanceError) {
+        console.error('Error fetching attendance:', attendanceError)
+      }
+
       if (!attendanceError && attendanceData) {
+        // Fetch session descriptions for all attendance records
+        const sessionIds = attendanceData
+          .map(record => record.session_id)
+          .filter(id => id !== null && id !== undefined)
+        
+        console.log('Session IDs to fetch:', sessionIds)
+        
+        let sessionMap: { [key: string]: any } = {}
+        
+        if (sessionIds.length > 0) {
+          const { data: sessionData, error: sessionError } = await supabase
+            .from('attendance_sessions')
+            .select('id, session_description, date, start_time, end_time, late_threshold, absent_threshold')
+            .in('id', sessionIds)
+          
+          if (sessionError) {
+            console.error('Error fetching sessions - Full error:', {
+              message: sessionError.message,
+              code: sessionError.code,
+              details: sessionError.details,
+              hint: sessionError.hint
+            })
+          } else {
+            console.log('Sessions fetched successfully:', sessionData)
+            if (sessionData) {
+              sessionMap = sessionData.reduce((acc: any, session: any) => ({
+                ...acc,
+                [session.id]: session
+              }), {})
+            }
+          }
+        }
+
         const extendedData = attendanceData.map(record => ({
           ...record,
           teacher_name: record.teachers?.full_name || 'Unknown',
-          teacher_id: record.teacher_id
+          teacher_id: record.teacher_id,
+          session_description: sessionMap[record.session_id]?.session_description || null,
+          session_date: sessionMap[record.session_id]?.date || record.date
         }))
         setAttendance(extendedData)
         calculateTeacherStats(extendedData)
@@ -663,6 +757,12 @@ export default function StudentDashboard() {
                           <UserCircle className="w-4 h-4 text-gray-400" />
                           <span className="text-sm text-gray-600 break-words">{record.teacher_name || 'Unknown'}</span>
                         </div>
+                        {record.session_description && (
+                          <div className="mt-2 p-2 bg-blue-50 rounded-lg border border-blue-100">
+                            <p className="text-xs text-blue-800 font-medium">📋 Session Details:</p>
+                            <p className="text-xs text-blue-700 mt-1 break-words">{record.session_description}</p>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -676,6 +776,7 @@ export default function StudentDashboard() {
                           <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Time</th>
                           <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Teacher</th>
                           <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                          <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Session Description</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
@@ -709,6 +810,17 @@ export default function StudentDashboard() {
                                 {record.status}
                               </span>
                             </td>
+                            <td className="py-3 px-5">
+                              {record.session_description ? (
+                                <div className="max-w-xs">
+                                  <p className="text-xs text-blue-700 bg-blue-50 px-2 py-1 rounded-lg inline-block">
+                                    {record.session_description}
+                                  </p>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-gray-400">No description</span>
+                              )}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -723,6 +835,7 @@ export default function StudentDashboard() {
       case 'profile':
         return (
           <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+            {/* Profile header - keeping existing code */}
             <div className="relative px-4 sm:px-6 md:px-8 py-5 sm:py-6 bg-gradient-to-r from-indigo-900 via-purple-900 to-pink-900 overflow-hidden">
               <div className="absolute inset-0 opacity-10">
                 <div className="absolute -top-24 -right-24 w-48 sm:w-64 h-48 sm:h-64 bg-white rounded-full blur-3xl"></div>
@@ -761,6 +874,7 @@ export default function StudentDashboard() {
               </div>
             </div>
 
+            {/* Message display */}
             {message.text && (
               <div className={`mx-4 sm:mx-6 md:mx-8 mt-4 sm:mt-6 p-3 sm:p-4 rounded-xl ${
                 message.type === 'success' 
@@ -778,6 +892,7 @@ export default function StudentDashboard() {
               </div>
             )}
 
+            {/* Photo upload section - keeping existing code */}
             {isEditing && (
               <div className="mx-4 sm:mx-6 md:mx-8 mt-4 sm:mt-6 p-4 sm:p-6 bg-gradient-to-r from-indigo-50/50 via-purple-50/50 to-pink-50/50 rounded-xl border border-gray-200">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
@@ -849,9 +964,11 @@ export default function StudentDashboard() {
               </div>
             )}
 
+            {/* Rest of profile content - keeping existing code */}
             <div className="p-4 sm:p-6 md:p-8">
               {!isEditing ? (
                 <div className="space-y-6 sm:space-y-8">
+                  {/* Personal Information */}
                   <div>
                     <h3 className="text-base sm:text-lg font-semibold text-gray-800 pb-2 border-b border-gray-200 flex items-center gap-2">
                       <User className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600" />
@@ -895,6 +1012,7 @@ export default function StudentDashboard() {
                     </div>
                   </div>
 
+                  {/* Academic Information */}
                   <div>
                     <h3 className="text-base sm:text-lg font-semibold text-gray-800 pb-2 border-b border-gray-200 flex items-center gap-2">
                       <GraduationCap className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" />
@@ -928,6 +1046,7 @@ export default function StudentDashboard() {
                     </div>
                   </div>
 
+                  {/* Parents & Guardian */}
                   {(student?.father_name || student?.mother_name || student?.guardian_name) && (
                     <div>
                       <h3 className="text-base sm:text-lg font-semibold text-gray-800 pb-2 border-b border-gray-200 flex items-center gap-2">
@@ -966,6 +1085,7 @@ export default function StudentDashboard() {
                     </div>
                   )}
 
+                  {/* Medical Information */}
                   {(student?.medical_conditions || student?.medications || student?.allergies) && (
                     <div>
                       <h3 className="text-base sm:text-lg font-semibold text-gray-800 pb-2 border-b border-gray-200 flex items-center gap-2">
@@ -995,6 +1115,7 @@ export default function StudentDashboard() {
                     </div>
                   )}
 
+                  {/* Emergency Contact */}
                   <div>
                     <h3 className="text-base sm:text-lg font-semibold text-gray-800 pb-2 border-b border-gray-200 flex items-center gap-2">
                       <Phone className="w-4 h-4 sm:w-5 sm:h-5 text-rose-600" />
@@ -1008,6 +1129,7 @@ export default function StudentDashboard() {
                 </div>
               ) : (
                 <div className="space-y-6">
+                  {/* Edit tabs - keeping existing code */}
                   <div className="flex gap-1 sm:gap-2 overflow-x-auto pb-2 border-b border-gray-200">
                     {[
                       { id: 'personal', label: 'Personal Info', icon: User },
@@ -1036,6 +1158,7 @@ export default function StudentDashboard() {
                     })}
                   </div>
 
+                  {/* Edit forms - keeping existing code, just need to ensure grade/section dropdowns use SPC/SPP */}
                   {editTab === 'personal' && (
                     <div className="space-y-6">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
@@ -1165,13 +1288,21 @@ export default function StudentDashboard() {
                             </div>
                             <select
                               value={editedStudent.grade || ''}
-                              onChange={(e) => handleInputChange('grade', e.target.value)}
+                              onChange={(e) => {
+                                const newGrade = e.target.value;
+                                handleInputChange('grade', newGrade);
+                                // Auto-set section based on grade
+                                if (newGrade === '11') {
+                                  handleInputChange('section', 'SPC');
+                                } else if (newGrade === '12') {
+                                  handleInputChange('section', 'SPP');
+                                }
+                              }}
                               className="w-full pl-9 sm:pl-11 pr-3 sm:pr-4 py-2 sm:py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all appearance-none text-sm"
                             >
                               <option value="">Select grade</option>
-                              {[11,12].map(grade => (
-                                <option key={grade} value={grade}>Grade {grade}</option>
-                              ))}
+                              <option value="11">Grade 11</option>
+                              <option value="12">Grade 12</option>
                             </select>
                           </div>
                         </div>
@@ -1189,13 +1320,20 @@ export default function StudentDashboard() {
                               value={editedStudent.section || ''}
                               onChange={(e) => handleInputChange('section', e.target.value)}
                               className="w-full pl-9 sm:pl-11 pr-3 sm:pr-4 py-2 sm:py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all appearance-none text-sm"
+                              disabled={!editedStudent.grade}
                             >
                               <option value="">Select section</option>
-                              {['A','B','C','D','E','F'].map(section => (
-                                <option key={section} value={section}>Section {section}</option>
-                              ))}
+                              {editedStudent.grade === '11' && (
+                                <option value="SPC">SPC</option>
+                              )}
+                              {editedStudent.grade === '12' && (
+                                <option value="SPP">SPP</option>
+                              )}
                             </select>
                           </div>
+                          {!editedStudent.grade && (
+                            <p className="text-xs text-amber-600 mt-1">Please select grade first</p>
+                          )}
                         </div>
 
                         <div className="sm:col-span-2 space-y-2">
@@ -1640,7 +1778,7 @@ export default function StudentDashboard() {
                 </div>
               )}
 
-              {/* Detailed Attendance Records */}
+              {/* Detailed Attendance Records with Session Description */}
               <div className="p-4 sm:p-6">
                 <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-3 sm:mb-4">Detailed Attendance Records</h3>
                 {attendance.length === 0 ? (
@@ -1656,11 +1794,11 @@ export default function StudentDashboard() {
                     {/* Mobile Card View */}
                     <div className="block md:hidden space-y-3">
                       {attendance.map((record) => (
-                        <div key={record.id} className="bg-gray-50 rounded-xl p-4 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
+                          <div key={record.id} className="bg-gray-50 rounded-2xl p-4 space-y-3 shadow-sm border border-gray-100">
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                              <div className="flex items-center gap-2 min-w-0">
                               <Calendar className="w-4 h-4 text-gray-500" />
-                              <span className="font-medium text-gray-900 text-sm">
+                                <span className="font-medium text-gray-900 text-sm break-words">
                                 {new Date(record.date).toLocaleDateString('en-US', { 
                                   month: 'short', 
                                   day: 'numeric', 
@@ -1673,30 +1811,53 @@ export default function StudentDashboard() {
                               <span className="capitalize">{record.status}</span>
                             </span>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
                             <Clock className="w-4 h-4 text-gray-500" />
-                            <span className="text-sm text-gray-700">{formatTime(record.time_in)}</span>
+                            <span className="text-sm text-gray-700 break-words">{formatTime(record.time_in)}</span>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
                             <UserCircle className="w-4 h-4 text-gray-500" />
                             <span className="text-sm text-gray-700 break-words">{record.teacher_name || 'Unknown'}</span>
                           </div>
-                          <div className="text-xs text-gray-500">
-                            {new Date(record.date).toLocaleDateString('en-US', { weekday: 'long' })}
+                          {record.session_description && (
+                            <button
+                              type="button"
+                              onClick={() => openSessionDescription(record)}
+                              className="mt-2 w-full text-left p-3 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors"
+                            >
+                              <div className="flex items-start gap-2">
+                                <FileText className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-xs font-semibold text-blue-800 mb-1">Session Description</p>
+                                  <p className="text-sm text-blue-700 break-words leading-relaxed">
+                                    {getSessionDescriptionPreview(record.session_description)}
+                                  </p>
+                                  {record.session_description.length > 96 && (
+                                    <span className="mt-2 inline-flex text-xs font-medium text-blue-800">
+                                      Tap to view full description
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </button>
+                          )}
+                          <div className="text-xs text-gray-500 break-words">
+                            {formatSessionDate(record.date)}
                           </div>
                         </div>
                       ))}
                     </div>
 
                     {/* Desktop Table View */}
-                    <div className="hidden md:block overflow-x-auto">
-                      <table className="w-full min-w-[600px]">
+                    <div className="hidden md:block overflow-x-auto -mx-4 px-4">
+                      <table className="w-full min-w-[820px]">
                         <thead>
                           <tr className="bg-gray-50">
                             <th className="py-3 px-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
                             <th className="py-3 px-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Time In</th>
                             <th className="py-3 px-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Teacher</th>
                             <th className="py-3 px-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                            <th className="py-3 px-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Session Description</th>
                             <th className="py-3 px-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Day</th>
                           </tr>
                         </thead>
@@ -1734,7 +1895,33 @@ export default function StudentDashboard() {
                                   {record.status}
                                 </span>
                               </td>
-                              <td className="py-3 px-4 whitespace-nowrap">
+                              <td className="py-3 px-4">
+                                {record.session_description ? (
+                                  <div className="max-w-lg">
+                                    <button
+                                      type="button"
+                                      onClick={() => openSessionDescription(record)}
+                                      className="w-full text-left flex items-start gap-2 rounded-lg px-3 py-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors"
+                                    >
+                                      <FileText className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                                      <div className="min-w-0 flex-1">
+                                        <p className="text-xs font-semibold text-blue-800 mb-1">Session Description</p>
+                                        <p className="text-xs text-blue-700 break-words leading-relaxed">
+                                          {getSessionDescriptionPreview(record.session_description)}
+                                        </p>
+                                        {record.session_description.length > 96 && (
+                                          <span className="mt-2 inline-flex text-[11px] font-medium text-blue-800">
+                                            Click to view full description
+                                          </span>
+                                        )}
+                                      </div>
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-gray-400">No description</span>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 whitespace-nowrap align-top">
                                 <span className="text-sm text-gray-600">
                                   {new Date(record.date).toLocaleDateString('en-US', { weekday: 'long' })}
                                 </span>
@@ -1750,7 +1937,7 @@ export default function StudentDashboard() {
             </div>
           </div>
         )
-      
+
       default:
         return null
     }
@@ -1788,7 +1975,7 @@ export default function StudentDashboard() {
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {mobileSidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={() => setMobileSidebarOpen(false)}
         ></div>
@@ -1971,6 +2158,52 @@ export default function StudentDashboard() {
         <main className="flex-1 px-3 sm:px-4 lg:px-6 py-4 sm:py-6">
           {renderContent()}
         </main>
+
+        {selectedSessionDescription && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 sm:p-6"
+            onClick={closeSessionDescription}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="session-description-title"
+              className="w-full max-w-2xl max-h-[88vh] overflow-hidden rounded-2xl bg-white shadow-2xl border border-gray-200"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-4 border-b border-gray-200 px-4 sm:px-6 py-4">
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm font-semibold uppercase tracking-wide text-blue-600">Attendance Session</p>
+                  <h2 id="session-description-title" className="text-lg sm:text-xl font-bold text-gray-900 mt-1 break-words">
+                    Session Description
+                  </h2>
+                  <p className="text-xs sm:text-sm text-gray-500 mt-1 break-words">
+                    {selectedSessionDescription.date} • {selectedSessionDescription.teacherName}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeSessionDescription}
+                  className="flex-shrink-0 rounded-full p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-800 transition-colors"
+                  aria-label="Close session description"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="max-h-[calc(88vh-110px)] overflow-y-auto px-4 sm:px-6 py-4 sm:py-5">
+                <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 sm:p-5">
+                  <div className="flex items-start gap-3">
+                    <FileText className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <p className="text-sm sm:text-base leading-relaxed text-blue-900 whitespace-pre-wrap break-words">
+                      {selectedSessionDescription.description}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <footer className="mt-auto py-2 sm:py-3 px-3 sm:px-4 lg:px-6 border-t border-gray-200 bg-white/80">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-1 sm:gap-2 text-[10px] sm:text-xs text-gray-500">
