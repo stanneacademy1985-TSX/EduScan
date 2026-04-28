@@ -676,7 +676,7 @@ export default function StudentDashboard() {
                           <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Time</th>
                           <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Teacher</th>
                           <th className="py-3 px-5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                         </tr>
+                        </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
                         {attendance.slice(0, 5).map((record) => (
@@ -689,7 +689,7 @@ export default function StudentDashboard() {
                                   year: 'numeric'
                                 })}
                               </span>
-                             </td>
+                            </td>
                             <td className="py-3 px-5 whitespace-nowrap">
                               <div className="flex items-center gap-2">
                                 <Clock className="w-4 h-4 text-gray-400" />
@@ -697,19 +697,19 @@ export default function StudentDashboard() {
                                   {formatTime(record.time_in)}
                                 </span>
                               </div>
-                             </td>
+                            </td>
                             <td className="py-3 px-5">
                               <span className="text-sm text-gray-600">
                                 {record.teacher_name || 'Unknown'}
                               </span>
-                             </td>
+                            </td>
                             <td className="py-3 px-5 whitespace-nowrap">
                               <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusColor(record.status)}`}>
                                 {getStatusIcon(record.status)}
                                 {record.status}
                               </span>
-                             </td>
-                           </tr>
+                            </td>
+                          </tr>
                         ))}
                       </tbody>
                     </table>
@@ -723,7 +723,6 @@ export default function StudentDashboard() {
       case 'profile':
         return (
           <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
-            {/* Profile Header */}
             <div className="relative px-4 sm:px-6 md:px-8 py-5 sm:py-6 bg-gradient-to-r from-indigo-900 via-purple-900 to-pink-900 overflow-hidden">
               <div className="absolute inset-0 opacity-10">
                 <div className="absolute -top-24 -right-24 w-48 sm:w-64 h-48 sm:h-64 bg-white rounded-full blur-3xl"></div>
@@ -838,7 +837,8 @@ export default function StudentDashboard() {
                           className="flex items-center justify-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-white hover:bg-gray-50 text-red-600 rounded-xl transition-all duration-200 text-xs sm:text-sm font-medium border border-gray-300 shadow-sm hover:shadow-md"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
-                          Remove                        </button>
+                          Remove
+                        </button>
                       )}
                     </div>
                     <p className="text-xs text-gray-500 mt-2">
@@ -1546,7 +1546,6 @@ export default function StudentDashboard() {
                 </div>
               </div>
 
-              {/* Teacher Performance Summary - Mobile Card View */}
               {Object.keys(teacherStats).length > 0 && (
                 <div className="p-4 sm:p-6 border-b border-gray-200">
                   <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-3 sm:mb-4">Teacher Performance Summary</h3>
@@ -1654,7 +1653,7 @@ export default function StudentDashboard() {
                   </div>
                 ) : (
                   <>
-                    {/* Mobile Card View for Attendance History */}
+                    {/* Mobile Card View */}
                     <div className="block md:hidden space-y-3">
                       {attendance.map((record) => (
                         <div key={record.id} className="bg-gray-50 rounded-xl p-4 space-y-2">
@@ -1699,7 +1698,7 @@ export default function StudentDashboard() {
                             <th className="py-3 px-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Teacher</th>
                             <th className="py-3 px-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
                             <th className="py-3 px-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Day</th>
-                           </>
+                          </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
                           {attendance.map((record) => (
@@ -1743,7 +1742,7 @@ export default function StudentDashboard() {
                             </tr>
                           ))}
                         </tbody>
-                      没有人
+                      </table>
                     </div>
                   </>
                 )}
@@ -1788,7 +1787,6 @@ export default function StudentDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      {/* Mobile Sidebar Overlay */}
       {mobileSidebarOpen && (
         <div 
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
@@ -1796,7 +1794,6 @@ export default function StudentDashboard() {
         ></div>
       )}
 
-      {/* Sidebar */}
       <aside 
         className={`
           fixed lg:static inset-y-0 left-0 z-50
@@ -1949,9 +1946,7 @@ export default function StudentDashboard() {
         </div>
       </aside>
 
-      {/* Main Content */}
       <div className="flex-1 flex flex-col min-h-screen">
-        {/* Header */}
         <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
           <div className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3">
             <div className="flex items-center justify-between">
@@ -1973,12 +1968,10 @@ export default function StudentDashboard() {
           </div>
         </header>
 
-        {/* Main Content Area */}
         <main className="flex-1 px-3 sm:px-4 lg:px-6 py-4 sm:py-6">
           {renderContent()}
         </main>
 
-        {/* Footer */}
         <footer className="mt-auto py-2 sm:py-3 px-3 sm:px-4 lg:px-6 border-t border-gray-200 bg-white/80">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-1 sm:gap-2 text-[10px] sm:text-xs text-gray-500">
             <div className="flex items-center gap-1 sm:gap-2">
