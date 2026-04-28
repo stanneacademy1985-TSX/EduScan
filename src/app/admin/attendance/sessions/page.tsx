@@ -420,6 +420,7 @@ export default function AttendanceSessionsPage() {
         .eq('grade', scopedGrade)
         .eq('section', scopedSection)
         .eq('date', newSession.date)
+        .eq('teacher_id', currentAdminData.id)
         .eq('is_active', true)
 
       if (checkError) {
@@ -428,7 +429,7 @@ export default function AttendanceSessionsPage() {
       }
 
       if (existing && existing.length > 0) {
-        alert('An active session already exists for this grade on this date')
+        alert('You already have an active session for this grade on this date')
         return
       }
 
