@@ -76,6 +76,7 @@ export default function StudentDashboard() {
     absent: number,
     rate: number
   }}>({})
+  const [selectedTeacherId, setSelectedTeacherId] = useState<string>('all')
   const [loading, setLoading] = useState(true)
   const [isClient, setIsClient] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
@@ -139,6 +140,15 @@ export default function StudentDashboard() {
       return date
     }
   }
+
+  // Build teacher options from current attendance records
+  const teacherOptions = Array.from(new Map(attendance.map(a => [a.teacher_id, a.teacher_name])))
+    .filter(([id]) => id)
+    .map(([id, name]) => ({ id: id as string, name: name || 'Unknown' }))
+
+  const filteredAttendance = (selectedTeacherId && selectedTeacherId !== 'all')
+    ? attendance.filter(r => r.teacher_id === selectedTeacherId)
+    : attendance
 
   useEffect(() => {
     if (!selectedSessionDescription) return
@@ -223,7 +233,19 @@ export default function StudentDashboard() {
         if (sessionIds.length > 0) {
           const { data: sessionData, error: sessionError } = await supabase
             .from('attendance_sessions')
-            .select('id, session_description, date, start_time, end_time, late_threshold, absent_threshold')
+            .select(`
+              id,
+              teacher_id,
+              session_description,
+              date,
+              start_time,
+              end_time,
+              late_threshold,
+              absent_threshold,
+              admin_users:teacher_id (
+                full_name
+              )
+            `)
             .in('id', sessionIds)
           
           if (sessionError) {
@@ -246,8 +268,8 @@ export default function StudentDashboard() {
 
         const extendedData = attendanceData.map(record => ({
           ...record,
-          teacher_name: record.teachers?.full_name || 'Unknown',
-          teacher_id: record.teacher_id,
+          teacher_name: record.teachers?.full_name || sessionMap[record.session_id]?.admin_users?.full_name || 'Unknown',
+          teacher_id: record.teacher_id || sessionMap[record.session_id]?.teacher_id || null,
           session_description: sessionMap[record.session_id]?.session_description || null,
           session_date: sessionMap[record.session_id]?.date || record.date
         }))
@@ -1780,8 +1802,24 @@ export default function StudentDashboard() {
 
               {/* Detailed Attendance Records with Session Description */}
               <div className="p-4 sm:p-6">
-                <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-3 sm:mb-4">Detailed Attendance Records</h3>
-                {attendance.length === 0 ? (
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-800">Detailed Attendance Records</h3>
+                  <div className="ml-2">
+                    <label className="sr-only">Filter by teacher</label>
+                    <select
+                      value={selectedTeacherId}
+                      onChange={(e) => setSelectedTeacherId(e.target.value)}
+                      className="text-sm px-3 py-2 border border-gray-200 rounded-lg bg-white"
+                    >
+                      <option value="all">All teachers</option>
+                      {teacherOptions.map(t => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {filteredAttendance.length === 0 ? (
                   <div className="text-center py-8 sm:py-12">
                     <div className="w-14 h-14 sm:w-16 sm:h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-3 sm:mb-4">
                       <Calendar className="w-6 h-6 sm:w-7 sm:h-7 text-gray-400" />
@@ -1793,8 +1831,8 @@ export default function StudentDashboard() {
                   <>
                     {/* Mobile Card View */}
                     <div className="block md:hidden space-y-3">
-                      {attendance.map((record) => (
-                          <div key={record.id} className="bg-gray-50 rounded-2xl p-4 space-y-3 shadow-sm border border-gray-100">
+                      {filteredAttendance.map((record) => (
+                        <div key={record.id} className="bg-gray-50 rounded-2xl p-4 space-y-3 shadow-sm border border-gray-100">
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                               <div className="flex items-center gap-2 min-w-0">
                               <Calendar className="w-4 h-4 text-gray-500" />
@@ -1862,7 +1900,7 @@ export default function StudentDashboard() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
-                          {attendance.map((record) => (
+                          {filteredAttendance.map((record) => (
                             <tr key={record.id} className="hover:bg-gray-50/50">
                               <td className="py-3 px-4 whitespace-nowrap">
                                 <span className="text-sm font-medium text-gray-900">
