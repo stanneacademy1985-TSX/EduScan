@@ -306,7 +306,12 @@ export class SuperAdminService {
     
     const gradeStats: Record<string, number> = {}
     gradeData?.forEach(record => {
-      const key = `Grade ${record.grade} - Section ${record.section}`
+      const normalizedSection = record.grade === '11'
+        ? 'SPC'
+        : record.grade === '12'
+          ? 'SPP'
+          : record.section
+      const key = `Grade ${record.grade} - Section ${normalizedSection}`
       gradeStats[key] = (gradeStats[key] || 0) + 1
     })
     
