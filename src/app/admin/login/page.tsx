@@ -492,13 +492,13 @@ export default function AdminLoginPage() {
               </div>
             </div>
 
-            {/* Student Login Link */}
+            {/* Student Login Link (changed to Super Admin login) */}
             <div className="text-center">
               <Link
-                href="/login"
+                href="/super-admin/login"
                 className="inline-flex items-center text-indigo-600 hover:text-indigo-800 font-medium text-sm group"
               >
-                Go to student login
+                Go to super-admin login
                 <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
               </Link>
             </div>
