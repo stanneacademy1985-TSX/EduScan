@@ -26,7 +26,9 @@ import {
   MousePointer,
   Fingerprint,
   Menu,
-  ChevronLeft
+  ChevronLeft,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react'
 import jsQR from 'jsqr'
 import { decryptFromQR, extractLRNFromDecrypted } from '../../../../../lib/encryption'
@@ -1003,6 +1005,36 @@ export default function QRScannerPage() {
     }
   }
 
+  // Helper function to get status colors for seat cards
+  const getStatusStyles = (status: string) => {
+    switch (status) {
+      case 'present':
+        return {
+          card: 'bg-green-50 border-green-400 active:bg-green-100',
+          badge: 'bg-green-200 text-green-800',
+          dot: 'bg-green-500'
+        }
+      case 'late':
+        return {
+          card: 'bg-yellow-50 border-yellow-400 active:bg-yellow-100',
+          badge: 'bg-yellow-200 text-yellow-800',
+          dot: 'bg-yellow-500'
+        }
+      case 'absent':
+        return {
+          card: 'bg-red-50 border-red-400 active:bg-red-100',
+          badge: 'bg-red-200 text-red-800',
+          dot: 'bg-red-500'
+        }
+      default:
+        return {
+          card: 'border-gray-200 bg-white hover:border-blue-300 hover:shadow-md active:bg-gray-50',
+          badge: '',
+          dot: 'bg-gray-300'
+        }
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -1091,7 +1123,11 @@ export default function QRScannerPage() {
           className="sm:hidden w-full flex items-center justify-between bg-white rounded-lg shadow-sm border border-gray-200 p-3 mb-2"
         >
           <span className="text-sm font-medium text-gray-700">Attendance Summary</span>
-          <ChevronLeft className={`w-4 h-4 text-gray-500 transition-transform ${statsVisible ? 'rotate-90' : '-rotate-90'}`} />
+          {statsVisible ? (
+            <ChevronUp className="w-4 h-4 text-gray-500" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-gray-500" />
+          )}
         </button>
         
         <div className={`grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 transition-all duration-300 ${
@@ -1456,7 +1492,7 @@ export default function QRScannerPage() {
             )}
           </div>
 
-          {/* Seat Plan Grid - Responsive */}
+          {/* Seat Plan Grid - Responsive with Fixed Status Badges */}
           <div className="p-2 sm:p-4">
             {sectionStudents.length === 0 ? (
               <div className="text-center py-8 sm:py-12">
@@ -1466,61 +1502,63 @@ export default function QRScannerPage() {
               </div>
             ) : (
               <>
-                {/* Responsive grid - 2 columns mobile, more on desktop */}
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-2 sm:gap-3 md:gap-4">
+                {/* Responsive grid - 3 columns mobile, more on desktop */}
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-1.5 sm:gap-2 md:gap-3">
                   {seatArrangement.map((student, index) => {
                     const status = studentAttendanceStatus[student.id]
                     const isMarked = !!status
                     const displayName = getSimplifiedName(student)
                     const isSelected = selectedStudentId === student.id
+                    const statusStyles = getStatusStyles(status)
                     
                     return (
                       <div
                         key={student.id}
                         onClick={() => handleStudentCardClick(student.id)}
-                        className={`relative rounded-lg sm:rounded-xl border-2 transition-all duration-200 cursor-pointer touch-manipulation ${
+                        className={`relative rounded-lg sm:rounded-xl border-2 transition-all duration-200 cursor-pointer touch-manipulation min-h-[80px] sm:min-h-[90px] md:min-h-[100px] flex flex-col ${
                           isMarked
-                            ? status === 'present'
-                              ? 'bg-green-50 border-green-400 active:bg-green-100'
-                              : status === 'late'
-                              ? 'bg-yellow-50 border-yellow-400 active:bg-yellow-100'
-                              : 'bg-red-50 border-red-400 active:bg-red-100'
+                            ? statusStyles.card
                             : isSelected
                             ? 'border-blue-400 bg-blue-50 ring-2 ring-blue-300'
-                            : 'border-gray-200 bg-white hover:border-blue-300 hover:shadow-md active:bg-gray-50'
+                            : statusStyles.card
                         } ${isMarkingMode && attendanceMode && !isMarked ? 'active:scale-95 transition-transform' : ''}`}
                       >
+                        {/* Status Indicator Bar - Top */}
+                        {isMarked && (
+                          <div className={`absolute top-0 left-0 right-0 h-1 sm:h-1.5 rounded-t-lg sm:rounded-t-xl ${
+                            status === 'present' ? 'bg-green-500' :
+                            status === 'late' ? 'bg-yellow-500' :
+                            'bg-red-500'
+                          }`}></div>
+                        )}
+
                         {/* Seat Number Badge */}
-                        <div className="absolute -top-1.5 -left-1.5 sm:-top-2 sm:-left-2 w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 rounded-full bg-gray-800 text-white text-xs font-bold flex items-center justify-center shadow-md z-10">
+                        <div className="absolute -top-2 -right-2 w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 rounded-full bg-gray-800 text-white text-[10px] sm:text-xs font-bold flex items-center justify-center shadow-md z-10">
                           {index + 1}
                         </div>
                         
-                        <div className="p-1.5 sm:p-2 md:p-3 pt-3 sm:pt-4">
-                          <div className="text-center">
-                            <p className="font-semibold text-gray-800 text-xs sm:text-sm md:text-base leading-tight break-words line-clamp-2">
+                        {/* Card Content */}
+                        <div className="flex-1 flex flex-col items-center justify-center p-1.5 sm:p-2 md:p-2.5 pt-3 sm:pt-3.5">
+                          {/* Status Badge - Top */}
+                          {isMarked && (
+                            <div className={`mb-1 sm:mb-1.5 px-1.5 sm:px-2 py-0.5 rounded-full ${statusStyles.badge}`}>
+                              <span className="text-[10px] sm:text-xs font-bold uppercase leading-none">
+                                {status}
+                              </span>
+                            </div>
+                          )}
+                          
+                          {/* Student Name */}
+                          <div className="text-center flex-1 flex items-center">
+                            <p className="font-semibold text-gray-800 text-[11px] sm:text-xs md:text-sm leading-tight break-words line-clamp-2">
                               {displayName}
                             </p>
                           </div>
                           
-                          {/* Status Indicator */}
-                          {isMarked && (
-                            <div className="mt-1.5 sm:mt-2 pt-1.5 sm:pt-2 border-t border-current border-opacity-20">
-                              <div className={`text-center py-0.5 px-1 sm:py-1 sm:px-2 rounded-md sm:rounded-lg ${
-                                status === 'present' ? 'bg-green-200 text-green-800' :
-                                status === 'late' ? 'bg-yellow-200 text-yellow-800' :
-                                'bg-red-200 text-red-800'
-                              }`}>
-                                <span className="text-xs font-bold uppercase">
-                                  {status}
-                                </span>
-                              </div>
-                            </div>
-                          )}
-                          
                           {/* Marking mode indicator for unmarked cards */}
                           {!isMarked && isMarkingMode && attendanceMode && (
-                            <div className="mt-1.5 sm:mt-2 pt-1.5 sm:pt-2 text-center">
-                              <div className="text-xs text-gray-400 italic">
+                            <div className="mt-1 sm:mt-1.5">
+                              <div className="text-[10px] sm:text-xs text-gray-400 italic">
                                 Tap to mark
                               </div>
                             </div>
@@ -1538,23 +1576,23 @@ export default function QRScannerPage() {
               <div className="mt-4 sm:mt-6 pt-3 sm:pt-4 border-t border-gray-200">
                 <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5 sm:gap-2">
                   <div className="bg-blue-50 rounded-lg p-1.5 sm:p-2 text-center">
-                    <p className="text-xs text-gray-600">Total</p>
+                    <p className="text-[10px] sm:text-xs text-gray-600">Total</p>
                     <p className="text-sm sm:text-lg font-bold text-blue-600">{sectionStudents.length}</p>
                   </div>
                   <div className="bg-green-50 rounded-lg p-1.5 sm:p-2 text-center">
-                    <p className="text-xs text-gray-600">Present</p>
+                    <p className="text-[10px] sm:text-xs text-gray-600">Present</p>
                     <p className="text-sm sm:text-lg font-bold text-green-600">{stats.presentCount}</p>
                   </div>
                   <div className="bg-yellow-50 rounded-lg p-1.5 sm:p-2 text-center">
-                    <p className="text-xs text-gray-600">Late</p>
+                    <p className="text-[10px] sm:text-xs text-gray-600">Late</p>
                     <p className="text-sm sm:text-lg font-bold text-yellow-600">{stats.lateCount}</p>
                   </div>
                   <div className="bg-red-50 rounded-lg p-1.5 sm:p-2 text-center">
-                    <p className="text-xs text-gray-600">Absent</p>
+                    <p className="text-[10px] sm:text-xs text-gray-600">Absent</p>
                     <p className="text-sm sm:text-lg font-bold text-red-600">{stats.absentCount}</p>
                   </div>
                   <div className="bg-purple-50 rounded-lg p-1.5 sm:p-2 text-center col-span-3 sm:col-span-1">
-                    <p className="text-xs text-gray-600">Complete</p>
+                    <p className="text-[10px] sm:text-xs text-gray-600">Complete</p>
                     <p className="text-sm sm:text-lg font-bold text-purple-600">
                       {Math.round(((stats.presentCount + stats.lateCount + stats.absentCount) / sectionStudents.length) * 100)}%
                     </p>
