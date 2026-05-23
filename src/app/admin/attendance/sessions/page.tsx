@@ -24,7 +24,9 @@ import {
   X,
   Menu,
   FileText,
-  MessageSquare
+  MessageSquare,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react'
 
 interface AttendanceSession {
@@ -63,17 +65,9 @@ interface SessionStudentDetail {
   notes: string | null
 }
 
-const buildGradeVariants = (grade: string): string[] => {
-  const raw = (grade || '').trim()
-  if (!raw) return []
-
-  const digits = raw.replace(/[^0-9]/g, '')
-  if (digits === '11' || digits === '12') {
-    return Array.from(new Set([raw, digits, `Grade ${digits}`]))
-  }
-
-  return [raw]
-}
+// Fixed thresholds (no user configuration needed)
+const DEFAULT_LATE_THRESHOLD_MINUTES = 15  // 15 minutes after start = late
+const DEFAULT_ABSENT_THRESHOLD_MINUTES = 30 // 30 minutes after start = absent
 
 export default function AttendanceSessionsPage() {
   const [sessions, setSessions] = useState<AttendanceSession[]>([])
@@ -83,7 +77,6 @@ export default function AttendanceSessionsPage() {
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEndModal, setShowEndModal] = useState(false)
-  const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [showSessionDetailsModal, setShowSessionDetailsModal] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
   const [showConfirmationPopup, setShowConfirmationPopup] = useState(false)
@@ -97,6 +90,7 @@ export default function AttendanceSessionsPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [currentAdmin, setCurrentAdmin] = useState<AdminSessionUser | null>(null)
   const [sessionDetailsLoading, setSessionDetailsLoading] = useState(false)
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
   const [sessionDetails, setSessionDetails] = useState<{
     present: SessionStudentDetail[]
     late: SessionStudentDetail[]
@@ -107,20 +101,12 @@ export default function AttendanceSessionsPage() {
     absent: []
   })
   
-  // New session form
+  // New session form - simplified
   const [newSession, setNewSession] = useState({
     grade: '',
     section: 'SHS',
     date: new Date().toISOString().split('T')[0],
-    late_threshold: '08:15',
-    absent_threshold: '09:00',
     session_description: ''
-  })
-
-  // Session settings
-  const [sessionSettings, setSessionSettings] = useState({
-    late_threshold: '08:15',
-    absent_threshold: '09:00'
   })
 
   const itemsPerPage = 10
@@ -128,22 +114,36 @@ export default function AttendanceSessionsPage() {
   // Helper function to format time for display
   const formatTime = (time: string) => {
     try {
-      if (time.length === 8 && time.includes(':')) {
+      if (time && time.length >= 5) {
         const [hours, minutes] = time.split(':')
-        return new Date(`2000-01-01T${hours}:${minutes}:00`).toLocaleTimeString('en-US', {
-          hour: 'numeric',
-          minute: '2-digit',
-          hour12: true
-        })
+        const hour = parseInt(hours)
+        const ampm = hour >= 12 ? 'PM' : 'AM'
+        const hour12 = hour % 12 || 12
+        return `${hour12}:${minutes} ${ampm}`
       }
-      return new Date(`2000-01-01T${time}:00`).toLocaleTimeString('en-US', {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
-      })
+      return time
     } catch {
       return time
     }
+  }
+
+  // Calculate thresholds based on session start time
+  const calculateLateThreshold = (startTime: string): string => {
+    if (!startTime) return '08:15:00'
+    const [hours, minutes] = startTime.split(':')
+    let totalMinutes = parseInt(hours) * 60 + parseInt(minutes) + DEFAULT_LATE_THRESHOLD_MINUTES
+    const newHours = Math.floor(totalMinutes / 60)
+    const newMinutes = totalMinutes % 60
+    return `${newHours.toString().padStart(2, '0')}:${newMinutes.toString().padStart(2, '0')}:00`
+  }
+
+  const calculateAbsentThreshold = (startTime: string): string => {
+    if (!startTime) return '08:30:00'
+    const [hours, minutes] = startTime.split(':')
+    let totalMinutes = parseInt(hours) * 60 + parseInt(minutes) + DEFAULT_ABSENT_THRESHOLD_MINUTES
+    const newHours = Math.floor(totalMinutes / 60)
+    const newMinutes = totalMinutes % 60
+    return `${newHours.toString().padStart(2, '0')}:${newMinutes.toString().padStart(2, '0')}:00`
   }
 
   // Show confirmation popup
@@ -212,7 +212,8 @@ export default function AttendanceSessionsPage() {
       let sessionsQuery = supabase
         .from('attendance_sessions')
         .select('*')
-        .order('created_at', { ascending: false })
+        .order('date', { ascending: false })
+        .order('start_time', { ascending: false })
 
       if (!isSuperAdmin(adminContext) && adminContext?.id) {
         sessionsQuery = sessionsQuery.eq('teacher_id', adminContext.id)
@@ -385,6 +386,16 @@ export default function AttendanceSessionsPage() {
     }
   }, [currentAdmin])
 
+  const toggleRowExpand = (sessionId: string) => {
+    const newExpanded = new Set(expandedRows)
+    if (newExpanded.has(sessionId)) {
+      newExpanded.delete(sessionId)
+    } else {
+      newExpanded.add(sessionId)
+    }
+    setExpandedRows(newExpanded)
+  }
+
   const handleCreateSession = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -401,7 +412,7 @@ export default function AttendanceSessionsPage() {
     }
 
     const scopedGrade = normalizeGrade(newSession.grade)
-    const scopedSection = newSession.section || firstSectionByGrade[scopedGrade] || 'SHS'
+    const scopedSection = newSession.section || 'SHS'
 
     if (!newSession.date) {
       alert('Please select a session date')
@@ -438,12 +449,9 @@ export default function AttendanceSessionsPage() {
       const minutes = now.getMinutes().toString().padStart(2, '0')
       const currentTime = `${hours}:${minutes}:00`
 
-      const lateThreshold = newSession.late_threshold.includes(':') 
-        ? newSession.late_threshold + ':00' 
-        : newSession.late_threshold
-      const absentThreshold = newSession.absent_threshold.includes(':') 
-        ? newSession.absent_threshold + ':00' 
-        : newSession.absent_threshold
+      // Auto-calculate thresholds based on start time
+      const lateThreshold = calculateLateThreshold(currentTime)
+      const absentThreshold = calculateAbsentThreshold(currentTime)
 
       const sessionData = {
         grade: scopedGrade,
@@ -474,50 +482,16 @@ export default function AttendanceSessionsPage() {
         grade: '',
         section: 'SHS',
         date: new Date().toISOString().split('T')[0],
-        late_threshold: '08:15',
-        absent_threshold: '09:00',
         session_description: ''
       })
       
       await fetchSessions()
       
-      // Show confirmation popup
       showConfirmation(`Session for Grade ${scopedGrade} - ${scopedSection} has been successfully created on ${newSession.date}!`)
       
     } catch (error: any) {
       console.error('Error creating session:', error)
       alert(`Failed to create session: ${error.message || 'Unknown error'}`)
-    }
-  }
-
-  const handleUpdateSettings = async () => {
-    if (!selectedSession) return
-
-    try {
-      const lateThreshold = sessionSettings.late_threshold.includes(':') 
-        ? sessionSettings.late_threshold + ':00' 
-        : sessionSettings.late_threshold
-      const absentThreshold = sessionSettings.absent_threshold.includes(':') 
-        ? sessionSettings.absent_threshold + ':00' 
-        : sessionSettings.absent_threshold
-
-      const { error } = await supabase
-        .from('attendance_sessions')
-        .update({
-          late_threshold: lateThreshold,
-          absent_threshold: absentThreshold
-        })
-        .eq('id', selectedSession.id)
-
-      if (error) throw error
-
-      setShowSettingsModal(false)
-      setSelectedSession(null)
-      await fetchSessions()
-      showConfirmation(`Session settings for Grade ${selectedSession.grade} have been updated successfully!`)
-    } catch (error) {
-      console.error('Error updating session settings:', error)
-      alert('Failed to update session settings')
     }
   }
 
@@ -652,7 +626,6 @@ export default function AttendanceSessionsPage() {
     }
   }
 
-  // FIXED: This function now only shows students who have actually submitted attendance
   const handleOpenSessionDetails = async (session: AttendanceSession) => {
     setSessionForDetails(session)
     setShowSessionDetailsModal(true)
@@ -660,7 +633,6 @@ export default function AttendanceSessionsPage() {
     setSessionDetails({ present: [], late: [], absent: [] })
 
     try {
-      // Fetch attendance records with student data using a join
       const { data: attendanceRows, error: attendanceError } = await supabase
         .from('attendance')
         .select(`
@@ -682,11 +654,8 @@ export default function AttendanceSessionsPage() {
       const late: SessionStudentDetail[] = []
       const absent: SessionStudentDetail[] = []
 
-      // Process only students who have submitted attendance
       attendanceRows?.forEach((row: any) => {
-        // Handle the nested students data properly
         const student = row.students
-        
         if (!student) return
 
         const entry: SessionStudentDetail = {
@@ -751,29 +720,23 @@ export default function AttendanceSessionsPage() {
     .filter(group => group.grade === '11' || group.grade === '12')
     .sort((a, b) => Number(a.grade) - Number(b.grade))
 
-  const firstSectionByGrade = groupedSectionList.reduce((acc, group) => {
-    const firstSection = [...group.sections].sort((a, b) => a.section.localeCompare(b.section))[0]
-    acc[group.grade] = firstSection?.section || ''
-    return acc
-  }, {} as Record<string, string>)
-
   return (
     <div className="space-y-4 sm:space-y-6 pb-20 sm:pb-0">
       {/* Confirmation Popup */}
       {showConfirmationPopup && (
         <div className="fixed bottom-4 right-4 z-50 animate-in slide-in-from-bottom-2">
-          <div className="bg-green-600 text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3">
-            <CheckCircle className="w-5 h-5" />
+          <div className="bg-green-600 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-2">
+            <CheckCircle className="w-4 h-4" />
             <p className="text-sm font-medium">{confirmationMessage}</p>
           </div>
         </div>
       )}
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 sticky top-0 bg-gray-50 z-20 py-3 sm:py-0 sm:static sm:bg-transparent">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Attendance Sessions</h1>
-          <p className="text-xs sm:text-sm text-gray-600 mt-0.5 sm:mt-1">Create and manage attendance sessions with custom time thresholds</p>
+          <p className="text-xs sm:text-sm text-gray-600 mt-0.5 sm:mt-1">Create and manage attendance sessions</p>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <button
@@ -785,7 +748,7 @@ export default function AttendanceSessionsPage() {
           </button>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex-1 sm:flex-initial justify-center text-sm sm:text-base"
+            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-md hover:shadow-lg flex-1 sm:flex-initial justify-center text-sm font-medium"
           >
             <Plus className="w-4 h-4" />
             <span>New Session</span>
@@ -794,41 +757,41 @@ export default function AttendanceSessionsPage() {
       </div>
 
       {/* Active Sessions Summary */}
-      <div className="bg-linear-to-br from-blue-600 to-purple-600 rounded-xl p-4 sm:p-6 text-white overflow-x-auto">
-        <div className="flex items-center justify-between mb-3 sm:mb-4">
-          <h2 className="text-base sm:text-lg font-semibold">Active Sessions</h2>
-          <Calendar className="w-5 h-5 sm:w-6 sm:h-6 opacity-80" />
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl p-5 text-white">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold">Overview</h2>
+          <Calendar className="w-5 h-5 opacity-80" />
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 min-w-[300px] sm:min-w-0">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div>
-            <p className="text-blue-100 text-xs sm:text-sm">Total Active</p>
-            <p className="text-xl sm:text-2xl font-bold">{sessions.filter(s => s.is_active).length}</p>
+            <p className="text-blue-100 text-xs">Active Sessions</p>
+            <p className="text-2xl font-bold">{sessions.filter(s => s.is_active).length}</p>
           </div>
           <div>
-            <p className="text-blue-100 text-xs sm:text-sm">Today's Sessions</p>
-            <p className="text-xl sm:text-2xl font-bold">
+            <p className="text-blue-100 text-xs">Today's Sessions</p>
+            <p className="text-2xl font-bold">
               {sessions.filter(s => s.date === new Date().toISOString().split('T')[0]).length}
             </p>
           </div>
           <div>
-            <p className="text-blue-100 text-xs sm:text-sm">Total Grades</p>
-            <p className="text-xl sm:text-2xl font-bold">{sections.length}</p>
+            <p className="text-blue-100 text-xs">Total Classes</p>
+            <p className="text-2xl font-bold">{sections.length}</p>
           </div>
           <div>
-            <p className="text-blue-100 text-xs sm:text-sm">Total Sessions</p>
-            <p className="text-xl sm:text-2xl font-bold">{sessions.length}</p>
+            <p className="text-blue-100 text-xs">Total Sessions</p>
+            <p className="text-2xl font-bold">{sessions.length}</p>
           </div>
         </div>
       </div>
 
       {/* Filters */}
-      <div className={`bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-5 transition-all duration-300 ${showFilters ? 'block' : 'hidden sm:block'}`}>
-        <div className={`grid grid-cols-1 gap-3 ${isSuperAdmin(currentAdmin) ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
+      <div className={`bg-white rounded-xl shadow-sm border border-gray-200 p-4 transition-all duration-300 ${showFilters ? 'block' : 'hidden sm:block'}`}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input
               type="text"
-              placeholder="Search by teacher, grade, description, or date..."
+              placeholder="Search sessions..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
@@ -875,28 +838,28 @@ export default function AttendanceSessionsPage() {
         </div>
       </div>
 
-      {/* Sessions List */}
+      {/* Sessions Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        {/* Desktop Table View */}
-        <div className="hidden lg:block overflow-x-auto">
-          <table className="w-full min-w-[980px]">
-            <thead className="bg-gray-50">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Teacher</th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Class</th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Thresholds</th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Attendance</th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                <th className="w-10 px-4 py-3"></th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Teacher</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Class</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Description</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Date</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Time</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Thresholds</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Attendance</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="px-4 sm:px-6 py-8 sm:py-12 text-center">
+                  <td colSpan={10} className="px-4 py-12 text-center">
                     <div className="flex justify-center">
                       <div className="w-8 h-8 border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin"></div>
                     </div>
@@ -904,7 +867,7 @@ export default function AttendanceSessionsPage() {
                 </tr>
               ) : paginatedSessions.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 sm:px-6 py-8 sm:py-12 text-center text-gray-500">
+                  <td colSpan={10} className="px-4 py-12 text-center text-gray-500">
                     No attendance sessions found
                   </td>
                 </tr>
@@ -913,18 +876,12 @@ export default function AttendanceSessionsPage() {
                   <SessionRow
                     key={session.id}
                     session={session}
+                    isExpanded={expandedRows.has(session.id)}
+                    onToggleExpand={() => toggleRowExpand(session.id)}
                     onViewDetails={() => handleOpenSessionDetails(session)}
                     onEnd={() => {
                       setSelectedSession(session)
                       setShowEndModal(true)
-                    }}
-                    onSettings={() => {
-                      setSelectedSession(session)
-                      setSessionSettings({
-                        late_threshold: session.late_threshold ? session.late_threshold.slice(0, 5) : '08:15',
-                        absent_threshold: session.absent_threshold ? session.absent_threshold.slice(0, 5) : '09:00'
-                      })
-                      setShowSettingsModal(true)
                     }}
                     onDelete={handleDeleteSession}
                     formatTime={formatTime}
@@ -935,230 +892,27 @@ export default function AttendanceSessionsPage() {
           </table>
         </div>
 
-        {/* Tablet View (md to lg) */}
-        <div className="hidden md:block lg:hidden">
-          <div className="divide-y divide-gray-200">
-            {loading ? (
-              <div className="flex justify-center py-12">
-                <div className="w-8 h-8 border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin"></div>
-              </div>
-            ) : paginatedSessions.length === 0 ? (
-              <div className="text-center py-12 text-gray-500">No attendance sessions found</div>
-            ) : (
-              paginatedSessions.map((session) => (
-                <div
-                  key={session.id}
-                  className="p-4 space-y-3 cursor-pointer hover:bg-blue-50/40 transition-colors"
-                  onClick={() => handleOpenSessionDetails(session)}
-                >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <UserCircle className="w-4 h-4 text-gray-400" />
-                        <span className="font-medium text-sm">{session.admin_users?.full_name || 'Unknown'}</span>
-                      </div>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Users className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm">Grade {session.grade}</span>
-                      </div>
-                    </div>
-                    {session.is_active ? (
-                      <span className="flex items-center gap-1 text-green-600 text-xs">
-                        <Play className="w-3 h-3" />
-                        Active
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 text-gray-600 text-xs">
-                        <Pause className="w-3 h-3" />
-                        Ended
-                      </span>
-                    )}
-                  </div>
-                  {session.session_description && (
-                    <div className="flex items-center gap-1 text-xs text-gray-500 bg-gray-50 p-2 rounded-lg">
-                      <MessageSquare className="w-3 h-3" />
-                      <span className="truncate">{session.session_description}</span>
-                    </div>
-                  )}
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="flex items-center gap-1 text-gray-500">
-                      <Calendar className="w-3 h-3" />
-                      <span>{new Date(session.date).toLocaleDateString()}</span>
-                    </div>
-                    <div className="flex items-center gap-1 text-gray-500">
-                      <Clock className="w-3 h-3" />
-                      <span>{formatTime(session.start_time)}</span>
-                    </div>
-                    <div className="col-span-2 text-gray-500">
-                      <span className="font-medium">Thresholds:</span> Late: {formatTime(session.late_threshold)} | Absent: {formatTime(session.absent_threshold)}
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                    <AttendanceStats sessionId={session.id} />
-                    <div className="flex items-center gap-2">
-                      {session.is_active ? (
-                        <>
-                          <button
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              setSelectedSession(session)
-                              setSessionSettings({
-                                late_threshold: session.late_threshold ? session.late_threshold.slice(0, 5) : '08:15',
-                                absent_threshold: session.absent_threshold ? session.absent_threshold.slice(0, 5) : '09:00'
-                              })
-                              setShowSettingsModal(true)
-                            }}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                          >
-                            <Settings className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              setSelectedSession(session)
-                              setShowEndModal(true)
-                            }}
-                            className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                          >
-                            <Pause className="w-4 h-4" />
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            handleDeleteSession(session.id)
-                          }}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Mobile Card View */}
-        <div className="md:hidden divide-y divide-gray-200">
-          {loading ? (
-            <div className="flex justify-center py-12">
-              <div className="w-8 h-8 border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin"></div>
-            </div>
-          ) : paginatedSessions.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">No attendance sessions found</div>
-          ) : (
-            paginatedSessions.map((session) => (
-              <div
-                key={session.id}
-                className="p-4 space-y-3 cursor-pointer hover:bg-blue-50/40 transition-colors"
-                onClick={() => handleOpenSessionDetails(session)}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <p className="font-semibold text-gray-900 text-sm">{session.admin_users?.full_name || 'Unknown'}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">Grade {session.grade}</p>
-                  </div>
-                  {session.is_active ? (
-                    <span className="flex items-center gap-1 text-green-600 text-xs bg-green-50 px-2 py-1 rounded-full">
-                      <Play className="w-3 h-3" />
-                      Active
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1 text-gray-600 text-xs bg-gray-100 px-2 py-1 rounded-full">
-                      <Pause className="w-3 h-3" />
-                      Ended
-                    </span>
-                  )}
-                </div>
-                {session.session_description && (
-                  <div className="flex items-start gap-1 text-xs text-gray-500 bg-gray-50 p-2 rounded-lg">
-                    <MessageSquare className="w-3 h-3 mt-0.5 shrink-0" />
-                    <span className="text-xs">{session.session_description}</span>
-                  </div>
-                )}
-                <div className="flex items-center gap-3 text-xs text-gray-500">
-                  <div className="flex items-center gap-1">
-                    <Calendar className="w-3 h-3" />
-                    <span>{new Date(session.date).toLocaleDateString()}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    <span>{formatTime(session.start_time)}</span>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                  <AttendanceStats sessionId={session.id} />
-                  <div className="flex items-center gap-2">
-                    {session.is_active ? (
-                      <>
-                        <button
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            setSelectedSession(session)
-                            setSessionSettings({
-                              late_threshold: session.late_threshold ? session.late_threshold.slice(0, 5) : '08:15',
-                              absent_threshold: session.absent_threshold ? session.absent_threshold.slice(0, 5) : '09:00'
-                            })
-                            setShowSettingsModal(true)
-                          }}
-                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                        >
-                          <Settings className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            setSelectedSession(session)
-                            setShowEndModal(true)
-                          }}
-                          className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                        >
-                          <Pause className="w-4 h-4" />
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          handleDeleteSession(session.id)
-                        }}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-
         {/* Pagination */}
         {filteredSessions.length > 0 && (
-          <div className="px-3 sm:px-6 py-3 sm:py-4 bg-gray-50 border-t border-gray-200 flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-2 sm:justify-between">
-            <p className="text-xs sm:text-sm text-gray-600">
+          <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <p className="text-sm text-gray-600">
               Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredSessions.length)} of {filteredSessions.length} sessions
             </p>
-            <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
-                className="p-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                className="p-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <span className="px-3 py-1.5 sm:px-4 sm:py-2 bg-blue-600 text-white rounded-lg text-sm">
-                {currentPage}
+              <span className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium">
+                {currentPage} / {totalPages}
               </span>
               <button
                 onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                 disabled={currentPage === totalPages}
-                className="p-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                className="p-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -1167,21 +921,19 @@ export default function AttendanceSessionsPage() {
         )}
       </div>
 
+      {/* Session Details Modal */}
       {showSessionDetailsModal && sessionForDetails && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-0 sm:p-4">
-          <div className="bg-white rounded-none sm:rounded-xl w-full h-full sm:h-auto sm:max-w-5xl overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 p-4 sm:p-6 z-10">
-              <div className="flex items-center justify-between gap-3">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 p-5 z-10">
+              <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-lg sm:text-xl font-bold text-gray-800">Session Attendance Details</h3>
+                  <h3 className="text-xl font-bold text-gray-800">Session Attendance Details</h3>
                   <p className="text-sm text-gray-600 mt-1">
                     Grade {sessionForDetails.grade} • {sessionForDetails.section} • {new Date(sessionForDetails.date).toLocaleDateString()}
                   </p>
                   {sessionForDetails.session_description && (
-                    <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                      <MessageSquare className="w-3 h-3" />
-                      {sessionForDetails.session_description}
-                    </p>
+                    <p className="text-xs text-gray-500 mt-1">{sessionForDetails.session_description}</p>
                   )}
                 </div>
                 <button
@@ -1189,7 +941,7 @@ export default function AttendanceSessionsPage() {
                     setShowSessionDetailsModal(false)
                     setSessionForDetails(null)
                   }}
-                  className="p-2 text-gray-400 hover:text-gray-700"
+                  className="p-2 text-gray-400 hover:text-gray-700 rounded-lg hover:bg-gray-100"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -1197,72 +949,80 @@ export default function AttendanceSessionsPage() {
             </div>
 
             {sessionDetailsLoading ? (
-              <div className="p-10 flex justify-center">
+              <div className="p-12 flex justify-center">
                 <div className="w-10 h-10 border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin"></div>
               </div>
             ) : (
-              <div className="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-                <div className="border border-green-200 bg-green-50 rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-semibold text-green-700">Present</h4>
-                    <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-medium">
-                      {sessionDetails.present.length}
-                    </span>
+              <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-5">
+                {/* Present */}
+                <div className="border border-green-200 bg-green-50 rounded-xl overflow-hidden">
+                  <div className="bg-green-100 px-4 py-3 border-b border-green-200">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-semibold text-green-800">Present</h4>
+                      <span className="px-2 py-0.5 rounded-full bg-green-200 text-green-800 text-xs font-bold">
+                        {sessionDetails.present.length}
+                      </span>
+                    </div>
                   </div>
-                  <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+                  <div className="max-h-96 overflow-y-auto divide-y divide-green-100">
                     {sessionDetails.present.length === 0 ? (
-                      <p className="text-sm text-green-700/80">No students marked present.</p>
+                      <div className="p-4 text-center text-green-600 text-sm">No students marked present</div>
                     ) : (
                       sessionDetails.present.map((student) => (
-                        <div key={student.id} className="bg-white border border-green-100 rounded-lg p-2.5">
-                          <p className="text-sm font-medium text-gray-800">{student.full_name}</p>
+                        <div key={student.id} className="p-3 hover:bg-green-100/50 transition-colors">
+                          <p className="font-medium text-gray-800 text-sm">{student.full_name}</p>
                           <p className="text-xs text-gray-500">LRN: {student.lrn}</p>
-                          {student.time_in && <p className="text-xs text-gray-500">Time In: {formatTime(student.time_in)}</p>}
+                          {student.time_in && <p className="text-xs text-green-600 mt-1">⏰ {formatTime(student.time_in)}</p>}
                         </div>
                       ))
                     )}
                   </div>
                 </div>
 
-                <div className="border border-yellow-200 bg-yellow-50 rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-semibold text-yellow-700">Late</h4>
-                    <span className="px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 text-xs font-medium">
-                      {sessionDetails.late.length}
-                    </span>
+                {/* Late */}
+                <div className="border border-yellow-200 bg-yellow-50 rounded-xl overflow-hidden">
+                  <div className="bg-yellow-100 px-4 py-3 border-b border-yellow-200">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-semibold text-yellow-800">Late</h4>
+                      <span className="px-2 py-0.5 rounded-full bg-yellow-200 text-yellow-800 text-xs font-bold">
+                        {sessionDetails.late.length}
+                      </span>
+                    </div>
                   </div>
-                  <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+                  <div className="max-h-96 overflow-y-auto divide-y divide-yellow-100">
                     {sessionDetails.late.length === 0 ? (
-                      <p className="text-sm text-yellow-700/80">No students marked late.</p>
+                      <div className="p-4 text-center text-yellow-600 text-sm">No students marked late</div>
                     ) : (
                       sessionDetails.late.map((student) => (
-                        <div key={student.id} className="bg-white border border-yellow-100 rounded-lg p-2.5">
-                          <p className="text-sm font-medium text-gray-800">{student.full_name}</p>
+                        <div key={student.id} className="p-3 hover:bg-yellow-100/50 transition-colors">
+                          <p className="font-medium text-gray-800 text-sm">{student.full_name}</p>
                           <p className="text-xs text-gray-500">LRN: {student.lrn}</p>
-                          {student.time_in && <p className="text-xs text-gray-500">Time In: {formatTime(student.time_in)}</p>}
+                          {student.time_in && <p className="text-xs text-yellow-600 mt-1">⏰ {formatTime(student.time_in)}</p>}
                         </div>
                       ))
                     )}
                   </div>
                 </div>
 
-                <div className="border border-red-200 bg-red-50 rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-semibold text-red-700">Absent</h4>
-                    <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-xs font-medium">
-                      {sessionDetails.absent.length}
-                    </span>
+                {/* Absent */}
+                <div className="border border-red-200 bg-red-50 rounded-xl overflow-hidden">
+                  <div className="bg-red-100 px-4 py-3 border-b border-red-200">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-semibold text-red-800">Absent</h4>
+                      <span className="px-2 py-0.5 rounded-full bg-red-200 text-red-800 text-xs font-bold">
+                        {sessionDetails.absent.length}
+                      </span>
+                    </div>
                   </div>
-                  <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+                  <div className="max-h-96 overflow-y-auto divide-y divide-red-100">
                     {sessionDetails.absent.length === 0 ? (
-                      <p className="text-sm text-red-700/80">No students marked absent.</p>
+                      <div className="p-4 text-center text-red-600 text-sm">No students marked absent</div>
                     ) : (
                       sessionDetails.absent.map((student) => (
-                        <div key={student.id} className="bg-white border border-red-100 rounded-lg p-2.5">
-                          <p className="text-sm font-medium text-gray-800">{student.full_name}</p>
+                        <div key={student.id} className="p-3 hover:bg-red-100/50 transition-colors">
+                          <p className="font-medium text-gray-800 text-sm">{student.full_name}</p>
                           <p className="text-xs text-gray-500">LRN: {student.lrn}</p>
-                          {student.time_in && <p className="text-xs text-gray-500">Time In: {formatTime(student.time_in)}</p>}
-                          {student.notes && <p className="text-xs text-gray-500">Note: {student.notes}</p>}
+                          {student.notes && <p className="text-xs text-red-600 mt-1">📝 {student.notes}</p>}
                         </div>
                       ))
                     )}
@@ -1274,27 +1034,24 @@ export default function AttendanceSessionsPage() {
         </div>
       )}
 
-      {/* Create Session Modal */}
+      {/* Create Session Modal - Simplified */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="sticky top-0 bg-white border-b border-gray-200 p-4 sm:p-6">
+          <div className="bg-white rounded-xl max-w-md w-full shadow-xl">
+            <div className="p-5 border-b border-gray-200">
               <div className="flex justify-between items-center">
-                <h3 className="text-lg sm:text-xl font-bold text-gray-800">Create New Session</h3>
+                <h3 className="text-xl font-bold text-gray-800">Create New Session</h3>
                 <button onClick={() => setShowCreateModal(false)} className="p-1 text-gray-400 hover:text-gray-700">
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <p className="text-xs sm:text-sm text-gray-500 mt-1">
-                You are creating this session as: <span className="font-semibold text-blue-600">
-                  {getCurrentAdminName()}
-                </span>
+              <p className="text-sm text-gray-500 mt-1">
+                Creating as: <span className="font-semibold text-blue-600">{getCurrentAdminName()}</span>
               </p>
             </div>
             
-            <form onSubmit={handleCreateSession} className="p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Grade */}
-              <div className="sm:col-span-1">
+            <form onSubmit={handleCreateSession} className="p-5 space-y-4">
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Select Grade <span className="text-red-500">*</span>
                 </label>
@@ -1302,11 +1059,10 @@ export default function AttendanceSessionsPage() {
                   value={newSession.grade}
                   onChange={(e) => {
                     const grade = e.target.value
-                    const section = firstSectionByGrade[grade] || 'SHS'
-                    setNewSession({ ...newSession, grade, section })
+                    setNewSession({ ...newSession, grade })
                   }}
                   required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                 >
                   <option value="">Choose a grade</option>
                   {groupedSectionList.map(g => (
@@ -1315,187 +1071,50 @@ export default function AttendanceSessionsPage() {
                 </select>
               </div>
 
-              {/* Section */}
-              <div className="sm:col-span-1">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Select Section</label>
-                <select
-                  value={newSession.section}
-                  onChange={(e) => setNewSession({ ...newSession, section: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
-                >
-                  <option value="">Choose a section</option>
-                  {sections
-                    .filter(s => normalizeGrade(s.grade) === normalizeGrade(newSession.grade || ''))
-                    .sort((a,b) => a.section.localeCompare(b.section))
-                    .map(s => (
-                      <option key={`${s.grade}-${s.section}`} value={s.section}>{s.section} ({s.student_count})</option>
-                    ))}
-                </select>
-              </div>
-              {/* Session Description */}
-              <div className="sm:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Session Description</label>
-                <textarea
-                  value={newSession.session_description}
-                  onChange={(e) => setNewSession({ ...newSession, session_description: e.target.value })}
-                  placeholder="e.g., First Quarter Examination, Chapter 3 Discussion, Laboratory Activity..."
-                  rows={3}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm resize-none"
-                />
-                <p className="text-xs text-gray-500 mt-1">Optional: Describe the purpose or content of this session</p>
-              </div>
-
-              {/* Date */}
-              <div className="sm:col-span-1">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Session Date <span className="text-red-500">*</span></label>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Session Date <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="date"
                   value={newSession.date}
                   onChange={(e) => setNewSession({ ...newSession, date: e.target.value })}
                   required
                   min={new Date().toISOString().split('T')[0]}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                 />
-              </div>
-
-              <div className="sm:col-span-1">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Start Immediately</label>
-                <div className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-700">Session starts when created</div>
-              </div>
-
-              {/* Custom Time Thresholds */}
-              <div className="border-t border-gray-200 pt-4">
-                <h4 className="font-medium text-gray-700 mb-3 flex items-center gap-2 text-sm">
-                  <Settings className="w-4 h-4" />
-                  Set Custom Time Thresholds
-                </h4>
-                
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Late Threshold
-                    </label>
-                    <input
-                      type="time"
-                      value={newSession.late_threshold}
-                      onChange={(e) => setNewSession({ ...newSession, late_threshold: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Students scanning after this time will be LATE</p>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Absent Threshold
-                    </label>
-                    <input
-                      type="time"
-                      value={newSession.absent_threshold}
-                      onChange={(e) => setNewSession({ ...newSession, absent_threshold: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Students not scanned by this time will be ABSENT</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="sm:col-span-2 bg-blue-50 p-3 sm:p-4 rounded-lg">
-                <div className="flex items-start gap-2 sm:gap-3">
-                  <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 mt-0.5 shrink-0" />
-                  <div className="text-xs sm:text-sm text-blue-700">
-                    <p className="font-medium mb-1">Session will start immediately upon creation</p>
-                    <p>You will be automatically assigned as the teacher for this session. Start time will be recorded as the current time.</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="sm:col-span-2 flex gap-3 pt-4">
-                <button type="button" onClick={() => setShowCreateModal(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm">Cancel</button>
-                <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm">Create Session</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Session Settings Modal */}
-      {showSettingsModal && selectedSession && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-md w-full">
-            <div className="p-4 sm:p-6 border-b border-gray-200">
-              <h3 className="text-lg sm:text-xl font-bold text-gray-800">Session Settings</h3>
-              <p className="text-xs sm:text-sm text-gray-500 mt-1">
-                Grade {selectedSession.grade}
-              </p>
-            </div>
-            
-            <div className="p-4 sm:p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Late Threshold
-                </label>
-                <input
-                  type="time"
-                  value={sessionSettings.late_threshold}
-                  onChange={(e) => setSessionSettings({
-                    ...sessionSettings,
-                    late_threshold: e.target.value
-                  })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Students scanning after this time will be marked as LATE
-                </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Absent Threshold
-                </label>
-                <input
-                  type="time"
-                  value={sessionSettings.absent_threshold}
-                  onChange={(e) => setSessionSettings({
-                    ...sessionSettings,
-                    absent_threshold: e.target.value
-                  })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+                <label className="block text-sm font-medium text-gray-700 mb-2">Session Description (Optional)</label>
+                <textarea
+                  value={newSession.session_description}
+                  onChange={(e) => setNewSession({ ...newSession, session_description: e.target.value })}
+                  placeholder="e.g., First Quarter Examination, Chapter 3 Discussion..."
+                  rows={3}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  Students who haven't scanned by this time will be marked as ABSENT
-                </p>
               </div>
 
-              <div className="bg-amber-50 p-3 sm:p-4 rounded-lg">
-                <div className="flex items-start gap-2 sm:gap-3">
-                  <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600 mt-0.5 shrink-0" />
-                  <div className="text-xs sm:text-sm text-amber-700">
-                    <p className="font-medium mb-1">How attendance status is determined:</p>
-                    <ul className="list-disc list-inside space-y-1 text-xs">
-                      <li>Scans before {formatTime(sessionSettings.late_threshold + ':00')} → <span className="text-green-600">PRESENT</span></li>
-                      <li>Scans between {formatTime(sessionSettings.late_threshold + ':00')} and {formatTime(sessionSettings.absent_threshold + ':00')} → <span className="text-yellow-600">LATE</span></li>
-                      <li>No scan by {formatTime(sessionSettings.absent_threshold + ':00')} → <span className="text-red-600">ABSENT</span></li>
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <Info className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
+                  <div className="text-sm text-blue-800">
+                    <p className="font-medium mb-1">Automatic Thresholds</p>
+                    <ul className="text-xs space-y-1 list-disc list-inside">
+                      <li>Session starts immediately when created</li>
+                      <li>{DEFAULT_LATE_THRESHOLD_MINUTES} minutes after start = LATE</li>
+                      <li>{DEFAULT_ABSENT_THRESHOLD_MINUTES} minutes after start = ABSENT</li>
                     </ul>
                   </div>
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-4">
-                <button
-                  onClick={() => setShowSettingsModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleUpdateSettings}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 text-sm"
-                >
-                  <Save className="w-4 h-4" />
-                  Save Settings
-                </button>
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setShowCreateModal(false)} className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium">Cancel</button>
+                <button type="submit" className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium">Create Session</button>
               </div>
-            </div>
+            </form>
           </div>
         </div>
       )}
@@ -1503,29 +1122,30 @@ export default function AttendanceSessionsPage() {
       {/* End Session Modal */}
       {showEndModal && selectedSession && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-md w-full p-5 sm:p-6">
+          <div className="bg-white rounded-xl max-w-md w-full p-6">
             <div className="text-center">
-              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
-                <Pause className="w-6 h-6 sm:w-8 sm:h-8 text-amber-600" />
+              <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Pause className="w-8 h-8 text-amber-600" />
               </div>
-              <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-2">End Session</h3>
-              <p className="text-sm sm:text-base text-gray-600 mb-5 sm:mb-6">
-                Are you sure you want to end this session for Grade {selectedSession.grade}?
-                <br />
-                <span className="text-xs sm:text-sm text-amber-600 mt-2 block">
-                  Students who haven't scanned by {formatTime(selectedSession.absent_threshold)} will be marked as ABSENT.
-                </span>
+              <h3 className="text-xl font-bold text-gray-800 mb-2">End Session</h3>
+              <p className="text-gray-600 mb-4">
+                End session for Grade {selectedSession.grade}?
               </p>
+              <div className="bg-amber-50 p-3 rounded-lg mb-6">
+                <p className="text-sm text-amber-700">
+                  Students who haven't scanned by {formatTime(selectedSession.absent_threshold)} will be marked as ABSENT.
+                </p>
+              </div>
               <div className="flex gap-3">
                 <button
                   onClick={() => setShowEndModal(false)}
-                  className="flex-1 px-3 sm:px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+                  className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleEndSession}
-                  className="flex-1 px-3 sm:px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-sm"
+                  className="flex-1 px-4 py-2.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors font-medium"
                 >
                   End Session
                 </button>
@@ -1538,7 +1158,212 @@ export default function AttendanceSessionsPage() {
   )
 }
 
-// Attendance Stats Component (reused)
+// Session Row Component
+function SessionRow({ session, isExpanded, onToggleExpand, onViewDetails, onEnd, onDelete, formatTime }: {
+  session: AttendanceSession
+  isExpanded: boolean
+  onToggleExpand: () => void
+  onViewDetails: () => void
+  onEnd: () => void
+  onDelete: (id: string) => void
+  formatTime: (time: string) => string
+}) {
+  const [attendanceCount, setAttendanceCount] = useState(0)
+  const [attendanceBreakdown, setAttendanceBreakdown] = useState({
+    present: 0,
+    late: 0,
+    absent: 0
+  })
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetchAttendanceStats()
+  }, [session.id])
+
+  const fetchAttendanceStats = async () => {
+    try {
+      const { count, error: countError } = await supabase
+        .from('attendance')
+        .select('*', { count: 'exact', head: true })
+        .eq('session_id', session.id)
+
+      if (countError) throw countError
+      setAttendanceCount(count || 0)
+
+      const { data, error: breakdownError } = await supabase
+        .from('attendance')
+        .select('status')
+        .eq('session_id', session.id)
+
+      if (breakdownError) throw breakdownError
+
+      const breakdown = {
+        present: data?.filter(a => a.status === 'present').length || 0,
+        late: data?.filter(a => a.status === 'late').length || 0,
+        absent: data?.filter(a => a.status === 'absent').length || 0
+      }
+      setAttendanceBreakdown(breakdown)
+    } catch (error) {
+      console.error('Error fetching attendance stats:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Calculate thresholds display
+  const lateThresholdTime = session.late_threshold ? formatTime(session.late_threshold) : 'N/A'
+  const absentThresholdTime = session.absent_threshold ? formatTime(session.absent_threshold) : 'N/A'
+
+  return (
+    <>
+      <tr className="hover:bg-gray-50 transition-colors">
+        <td className="px-4 py-3">
+          <button
+            onClick={onToggleExpand}
+            className="p-1 hover:bg-gray-100 rounded transition-colors"
+          >
+            {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
+          </button>
+        </td>
+        <td className="px-4 py-3" onClick={onViewDetails}>
+          <div className="flex items-center gap-2 cursor-pointer">
+            <UserCircle className="w-4 h-4 text-gray-400 shrink-0" />
+            <span className="font-medium text-sm">{session.admin_users?.full_name?.split(' ')[0] || 'Unknown'}</span>
+          </div>
+        </td>
+        <td className="px-4 py-3" onClick={onViewDetails}>
+          <div className="flex items-center gap-2 cursor-pointer">
+            <Users className="w-4 h-4 text-gray-400 shrink-0" />
+            <span className="font-medium text-sm">G{session.grade}</span>
+          </div>
+        </td>
+        <td className="px-4 py-3" onClick={onViewDetails}>
+          {session.session_description ? (
+            <div className="flex items-center gap-2 max-w-xs cursor-pointer">
+              <MessageSquare className="w-3 h-3 text-gray-400 shrink-0" />
+              <span className="text-sm text-gray-600 truncate" title={session.session_description}>
+                {session.session_description.length > 40 ? session.session_description.substring(0, 40) + '...' : session.session_description}
+              </span>
+            </div>
+          ) : (
+            <span className="text-sm text-gray-400 italic cursor-pointer" onClick={onViewDetails}>—</span>
+          )}
+        </td>
+        <td className="px-4 py-3" onClick={onViewDetails}>
+          <div className="flex items-center gap-2 cursor-pointer">
+            <Calendar className="w-4 h-4 text-gray-400 shrink-0" />
+            <span className="text-sm">{new Date(session.date).toLocaleDateString()}</span>
+          </div>
+        </td>
+        <td className="px-4 py-3" onClick={onViewDetails}>
+          <div className="flex items-center gap-2 cursor-pointer">
+            <Clock className="w-4 h-4 text-gray-400 shrink-0" />
+            <span className="text-sm">{formatTime(session.start_time)}</span>
+          </div>
+        </td>
+        <td className="px-4 py-3">
+          {session.is_active ? (
+            <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+              <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+              Active
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">
+              Ended
+            </span>
+          )}
+        </td>
+        <td className="px-4 py-3">
+          <div className="text-xs text-gray-500 space-y-0.5">
+            <div className="flex items-center gap-1">
+              <span className="w-12">Late:</span>
+              <span className="font-mono text-gray-700">{lateThresholdTime}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="w-12">Absent:</span>
+              <span className="font-mono text-gray-700">{absentThresholdTime}</span>
+            </div>
+          </div>
+        </td>
+        <td className="px-4 py-3" onClick={onViewDetails}>
+          {loading ? (
+            <div className="w-5 h-5 border-2 border-gray-200 border-t-blue-600 rounded-full animate-spin"></div>
+          ) : (
+            <div className="flex items-center gap-2 cursor-pointer">
+              <div className="flex items-center gap-1">
+                <CheckCircle className="w-3.5 h-3.5 text-green-600" />
+                <span className="text-xs font-medium text-green-600">{attendanceBreakdown.present}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5 text-amber-600" />
+                <span className="text-xs font-medium text-amber-600">{attendanceBreakdown.late}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <XCircle className="w-3.5 h-3.5 text-red-600" />
+                <span className="text-xs font-medium text-red-600">{attendanceBreakdown.absent}</span>
+              </div>
+              <span className="ml-1 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">
+                {attendanceCount}
+              </span>
+            </div>
+          )}
+        </td>
+        <td className="px-4 py-3">
+          <div className="flex items-center gap-1">
+            {session.is_active ? (
+              <button
+                onClick={(e) => { e.stopPropagation(); onEnd() }}
+                className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                title="End Session"
+              >
+                <Pause className="w-4 h-4" />
+              </button>
+            ) : (
+              <button
+                onClick={(e) => { e.stopPropagation(); onDelete(session.id) }}
+                className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                title="Delete Session"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </td>
+      </tr>
+      {isExpanded && (
+        <tr className="bg-gray-50">
+          <td colSpan={10} className="px-4 py-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-white rounded-lg p-3 border border-gray-200">
+                <h4 className="font-medium text-sm text-gray-700 mb-2">Session Info</h4>
+                <div className="space-y-1 text-sm">
+                  <p><span className="text-gray-500">Teacher:</span> {session.admin_users?.full_name || 'Unknown'}</p>
+                  <p><span className="text-gray-500">Grade:</span> {session.grade}</p>
+                  <p><span className="text-gray-500">Section:</span> {session.section}</p>
+                  <p><span className="text-gray-500">Started:</span> {formatTime(session.start_time)}</p>
+                  {session.end_time && <p><span className="text-gray-500">Ended:</span> {formatTime(session.end_time)}</p>}
+                </div>
+              </div>
+              <div className="bg-white rounded-lg p-3 border border-gray-200">
+                <h4 className="font-medium text-sm text-gray-700 mb-2">Thresholds</h4>
+                <div className="space-y-1 text-sm">
+                  <p><span className="text-gray-500">Late after:</span> {lateThresholdTime}</p>
+                  <p><span className="text-gray-500">Absent after:</span> {absentThresholdTime}</p>
+                </div>
+              </div>
+              <div className="bg-white rounded-lg p-3 border border-gray-200">
+                <h4 className="font-medium text-sm text-gray-700 mb-2">Description</h4>
+                <p className="text-sm text-gray-600">{session.session_description || 'No description provided'}</p>
+              </div>
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
+  )
+}
+
+// Attendance Stats Component
 function AttendanceStats({ sessionId }: { sessionId: string }) {
   const [attendanceCount, setAttendanceCount] = useState(0)
   const [attendanceBreakdown, setAttendanceBreakdown] = useState({
@@ -1605,179 +1430,5 @@ function AttendanceStats({ sessionId }: { sessionId: string }) {
         {attendanceCount}
       </span>
     </div>
-  )
-}
-
-// Session Row Component (for desktop)
-function SessionRow({ session, onViewDetails, onEnd, onSettings, onDelete, formatTime }: {
-  session: AttendanceSession
-  onViewDetails: () => void
-  onEnd: () => void
-  onSettings: () => void
-  onDelete: (id: string) => void 
-  formatTime: (time: string) => string
-}) {
-  const [attendanceCount, setAttendanceCount] = useState(0)
-  const [attendanceBreakdown, setAttendanceBreakdown] = useState({
-    present: 0,
-    late: 0,
-    absent: 0
-  })
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    fetchAttendanceStats()
-  }, [session.id])
-
-  const fetchAttendanceStats = async () => {
-    try {
-      const { count, error: countError } = await supabase
-        .from('attendance')
-        .select('*', { count: 'exact', head: true })
-        .eq('session_id', session.id)
-
-      if (countError) throw countError
-      setAttendanceCount(count || 0)
-
-      const { data, error: breakdownError } = await supabase
-        .from('attendance')
-        .select('status')
-        .eq('session_id', session.id)
-
-      if (breakdownError) throw breakdownError
-
-      const breakdown = {
-        present: data?.filter(a => a.status === 'present').length || 0,
-        late: data?.filter(a => a.status === 'late').length || 0,
-        absent: data?.filter(a => a.status === 'absent').length || 0
-      }
-      setAttendanceBreakdown(breakdown)
-
-    } catch (error) {
-      console.error('Error fetching attendance stats:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <tr className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={onViewDetails}>
-      <td className="px-4 sm:px-6 py-3 sm:py-4">
-        <div className="flex items-center gap-2">
-          <UserCircle className="w-4 h-4 text-gray-400 shrink-0" />
-          <span className="font-medium text-sm">{session.admin_users?.full_name || 'Unknown'}</span>
-        </div>
-      </td>
-      <td className="px-4 sm:px-6 py-3 sm:py-4">
-        <div className="flex items-center gap-2">
-          <Users className="w-4 h-4 text-gray-400 shrink-0" />
-          <span className="font-medium text-sm">Grade {session.grade}</span>
-        </div>
-      </td>
-      <td className="px-4 sm:px-6 py-3 sm:py-4">
-        {session.session_description ? (
-          <div className="flex items-center gap-2 max-w-xs">
-            <MessageSquare className="w-3 h-3 text-gray-400 shrink-0" />
-            <span className="text-sm text-gray-600 truncate" title={session.session_description}>
-              {session.session_description}
-            </span>
-          </div>
-        ) : (
-          <span className="text-sm text-gray-400 italic">No description</span>
-        )}
-       </td>
-      <td className="px-4 sm:px-6 py-3 sm:py-4">
-        <div className="flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-gray-400 shrink-0" />
-          <span className="text-sm">{new Date(session.date).toLocaleDateString()}</span>
-        </div>
-       </td>
-      <td className="px-4 sm:px-6 py-3 sm:py-4">
-        <div className="flex items-center gap-2">
-          <Clock className="w-4 h-4 text-gray-400 shrink-0" />
-          <span className="text-sm">
-            {formatTime(session.start_time)}
-            {session.end_time && ` - ${formatTime(session.end_time)}`}
-          </span>
-        </div>
-       </td>
-      <td className="px-4 sm:px-6 py-3 sm:py-4">
-        {session.is_active ? (
-          <span className="flex items-center gap-1 text-green-600 text-sm">
-            <Play className="w-4 h-4" />
-            Active
-          </span>
-        ) : (
-          <span className="flex items-center gap-1 text-gray-600 text-sm">
-            <Pause className="w-4 h-4" />
-            Ended
-          </span>
-        )}
-       </td>
-      <td className="px-4 sm:px-6 py-3 sm:py-4">
-        <div className="text-xs text-gray-600">
-          <div>Late: {session.late_threshold ? formatTime(session.late_threshold) : '08:15 AM'}</div>
-          <div>Absent: {session.absent_threshold ? formatTime(session.absent_threshold) : '09:00 AM'}</div>
-        </div>
-       </td>
-      <td className="px-4 sm:px-6 py-3 sm:py-4">
-        {loading ? (
-          <div className="w-5 h-5 border-2 border-gray-200 border-t-blue-600 rounded-full animate-spin"></div>
-        ) : (
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 text-xs">
-              <CheckCircle className="w-3 h-3 text-green-600" />
-              <span className="text-green-600">{attendanceBreakdown.present}</span>
-              <Clock className="w-3 h-3 text-yellow-600 ml-2" />
-              <span className="text-yellow-600">{attendanceBreakdown.late}</span>
-              <XCircle className="w-3 h-3 text-red-600 ml-2" />
-              <span className="text-red-600">{attendanceBreakdown.absent}</span>
-            </div>
-            <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs">
-              Total: {attendanceCount}
-            </span>
-          </div>
-        )}
-       </td>
-      <td className="px-4 sm:px-6 py-3 sm:py-4">
-        <div className="flex items-center gap-2">
-          {session.is_active ? (
-            <>
-              <button
-                onClick={(event) => {
-                  event.stopPropagation()
-                  onSettings()
-                }}
-                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                title="Session Settings"
-              >
-                <Settings className="w-4 h-4" />
-              </button>
-              <button
-                onClick={(event) => {
-                  event.stopPropagation()
-                  onEnd()
-                }}
-                className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                title="End Session"
-              >
-                <Pause className="w-4 h-4" />
-              </button>
-            </>
-          ) : (
-            <button
-              onClick={(event) => {
-                event.stopPropagation()
-                onDelete(session.id)
-              }}
-              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-              title="Delete Session"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-       </td>
-    </tr>
   )
 }
