@@ -74,6 +74,39 @@ interface AttendanceTrendPoint {
   absent: number
 }
 
+// Helper function to format name with proper capitalization and middle initial
+const formatFullName = (fullName: string | undefined): string => {
+  if (!fullName) return 'Unknown Student'
+  
+  const nameParts = fullName.trim().split(/\s+/)
+  
+  if (nameParts.length === 1) {
+    // Only first name
+    return capitalizeName(nameParts[0])
+  } else if (nameParts.length === 2) {
+    // First and Last name only
+    return `${capitalizeName(nameParts[0])} ${capitalizeName(nameParts[1])}`
+  } else if (nameParts.length >= 3) {
+    // First, Middle, Last name - format as "First M. Last"
+    const firstName = capitalizeName(nameParts[0])
+    const middleInitial = nameParts[1].charAt(0).toUpperCase()
+    const lastName = capitalizeName(nameParts[nameParts.length - 1])
+    return `${firstName} ${middleInitial}. ${lastName}`
+  }
+  
+  return capitalizeName(fullName)
+}
+
+// Helper function to capitalize first letter of each word
+const capitalizeName = (name: string): string => {
+  if (!name) return name
+  return name
+    .toLowerCase()
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+}
+
 export default function SuperAdminDashboard() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
@@ -179,7 +212,7 @@ export default function SuperAdminDashboard() {
         <div>
           <h1 className="text-3xl font-bold text-gray-800">
             Welcome, <span className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-              {admin?.full_name || 'Super Admin'}
+              {admin?.full_name ? formatFullName(admin.full_name) : 'Super Admin'}
             </span>
           </h1>
           <p className="text-gray-600 mt-1">School-wide attendance overview and management</p>
@@ -413,6 +446,7 @@ export default function SuperAdminDashboard() {
             <div className="space-y-4">
               {recentActivity.map((activity) => {
                 const student = Array.isArray(activity.students) ? activity.students[0] : activity.students
+                const formattedName = formatFullName(student?.full_name)
 
                 return (
                 <div key={activity.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
@@ -422,10 +456,10 @@ export default function SuperAdminDashboard() {
                     </div>
                     <div>
                       <p className="font-medium text-gray-800">
-                        {student?.full_name || 'Unknown Student'}
+                        {formattedName}
                       </p>
                       <p className="text-xs text-gray-500">
-                        {activity.section} • LRN: {activity.students?.lrn}
+                        {activity.section} • LRN: {student?.lrn}
                       </p>
                     </div>
                   </div>
