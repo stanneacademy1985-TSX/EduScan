@@ -3,7 +3,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { supabase } from '../../../../../lib/supabase'
 import { fetchAdminById, getAssignedStudentIds, getStoredAdminSession, hasAssignedScope, isSuperAdmin, storeAdminSession, type AdminSessionUser } from '../../../../../lib/admin-auth'
-import { validateLrn } from '../../../../../lib/lrn-validation'
 import { useRouter } from 'next/navigation'
 import { 
   QrCode,
@@ -11,9 +10,7 @@ import {
   CameraOff,
   CheckCircle,
   XCircle,
-  AlertCircle,  
   Users,
-  Calendar,
   Clock,
   RefreshCw,
   Zap,
@@ -24,15 +21,10 @@ import {
   Loader2,
   Shield,
   Lock,
-  UserPlus,
-  CheckSquare,
-  MessageSquare,
   Grid,
   LayoutGrid,
   MousePointer,
-  Fingerprint,
-  Download,
-  Printer
+  Fingerprint
 } from 'lucide-react'
 import jsQR from 'jsqr'
 import { decryptFromQR, extractLRNFromDecrypted } from '../../../../../lib/encryption'
@@ -158,7 +150,6 @@ export default function QRScannerPage() {
   const [attendanceMode, setAttendanceMode] = useState<'present' | 'late' | 'absent' | null>(null)
   const [isMarkingMode, setIsMarkingMode] = useState(false)
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null)
-  const [downloadingSeatPlan, setDownloadingSeatPlan] = useState(false)
 
   const [beepSound] = useState(() => {
     if (typeof Audio !== 'undefined') {
@@ -971,357 +962,6 @@ export default function QRScannerPage() {
     }
   }
 
-  const downloadSeatPlan = async () => {
-    if (!seatPlanRef.current || seatArrangement.length === 0) return
-    
-    setDownloadingSeatPlan(true)
-    
-    try {
-      const printWindow = window.open('', '_blank')
-      if (!printWindow) {
-        alert('Please allow popups to download the seat plan')
-        return
-      }
-      
-      const today = new Date().toLocaleDateString('en-US', { 
-        weekday: 'long', 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
-      })
-      const sessionInfo = selectedSessionDetails 
-        ? `Grade ${selectedSessionDetails.grade} - ${selectedSessionDetails.section}`
-        : 'Classroom'
-      
-      const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Seat Plan - ${sessionInfo}</title>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-          <style>
-            @page {
-              size: landscape;
-              margin: 0.5cm;
-            }
-            
-            * {
-              margin: 0;
-              padding: 0;
-              box-sizing: border-box;
-            }
-            
-            body {
-              font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Roboto', 'Helvetica Neue', sans-serif;
-              background: white;
-              color: #1f2937;
-              padding: 10px;
-              -webkit-print-color-adjust: exact;
-              print-color-adjust: exact;
-            }
-            
-            .container {
-              max-width: 100%;
-              margin: 0 auto;
-            }
-            
-            /* Header Styles */
-            .header {
-              text-align: center;
-              margin-bottom: 1.5rem;
-              padding-bottom: 0.75rem;
-              border-bottom: 2px solid #e5e7eb;
-            }
-            
-            .school-name {
-              font-size: 1.2rem;
-              font-weight: 700;
-              color: #1e40af;
-              margin-bottom: 0.3rem;
-            }
-            
-            .header h1 {
-              font-size: 1.6rem;
-              font-weight: 800;
-              color: #111827;
-              margin-bottom: 0.3rem;
-            }
-            
-            .session-info {
-              font-size: 1.1rem;
-              color: #4b5563;
-              font-weight: 600;
-            }
-            
-            .date-info {
-              font-size: 0.8rem;
-              color: #6b7280;
-              margin-top: 0.3rem;
-            }
-            
-            /* Seat Grid - MUCH LARGER cards for mobile */
-            .seat-grid {
-              display: grid;
-              grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-              gap: 1.5rem;
-              padding: 0.5rem;
-              margin-top: 1.5rem;
-            }
-            
-            /* Large Elegant Seat Card */
-            .seat-card {
-              background: white;
-              border: 2.5px solid #e5e7eb;
-              border-radius: 24px;
-              padding: 2rem 1rem;
-              text-align: center;
-              position: relative;
-              page-break-inside: avoid;
-              break-inside: avoid;
-              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-              min-height: 200px;
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              justify-content: center;
-            }
-            
-            /* Large Seat Number Badge */
-            .seat-number {
-              position: absolute;
-              top: -18px;
-              left: -18px;
-              width: 48px;
-              height: 48px;
-              background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
-              color: white;
-              border-radius: 50%;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              font-size: 1.2rem;
-              font-weight: 800;
-              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-              border: 3px solid white;
-            }
-            
-            /* Student Name - Much Larger Text */
-            .student-name {
-              font-size: 1.5rem;
-              font-weight: 800;
-              color: #111827;
-              margin-bottom: 0.75rem;
-              word-break: break-word;
-              line-height: 1.3;
-            }
-            
-            /* Student Details */
-            .student-details {
-              font-size: 0.9rem;
-              color: #6b7280;
-              margin-top: 0.5rem;
-            }
-            
-            /* Simple divider line */
-            .card-divider {
-              width: 60%;
-              height: 2px;
-              background: linear-gradient(90deg, transparent, #e5e7eb, transparent);
-              margin: 1rem auto 0.75rem;
-            }
-            
-            /* Footer */
-            .footer {
-              margin-top: 2rem;
-              padding-top: 1rem;
-              border-top: 2px solid #f3f4f6;
-              text-align: center;
-              font-size: 0.75rem;
-              color: #9ca3af;
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-              flex-wrap: wrap;
-              gap: 0.5rem;
-            }
-            
-            .footer .brand {
-              font-weight: 600;
-              color: #1e40af;
-            }
-            
-            /* Print-specific optimizations */
-            @media print {
-              body {
-                padding: 0;
-                margin: 0;
-              }
-              
-              .seat-card {
-                break-inside: avoid;
-                page-break-inside: avoid;
-                border-color: #d1d5db;
-                box-shadow: none;
-                min-height: 180px;
-                padding: 1.5rem 0.75rem;
-              }
-              
-              .seat-grid {
-                gap: 1rem;
-                grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-              }
-              
-              .student-name {
-                font-size: 1.3rem;
-              }
-            }
-            
-            /* Tablet Responsive */
-            @media (max-width: 1024px) and (min-width: 769px) {
-              .seat-grid {
-                grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-                gap: 1.25rem;
-              }
-              
-              .student-name {
-                font-size: 1.4rem;
-              }
-              
-              .seat-card {
-                min-height: 190px;
-              }
-            }
-            
-            /* Mobile Responsive - No zoom needed, cards take full width */
-            @media (max-width: 768px) {
-              body {
-                padding: 15px;
-              }
-              
-              .seat-grid {
-                grid-template-columns: 1fr;
-                gap: 1.25rem;
-              }
-              
-              .student-name {
-                font-size: 1.6rem;
-              }
-              
-              .seat-card {
-                padding: 2rem 1rem;
-                min-height: 220px;
-              }
-              
-              .seat-number {
-                width: 52px;
-                height: 52px;
-                font-size: 1.3rem;
-                top: -20px;
-                left: -20px;
-              }
-              
-              .student-details {
-                font-size: 1rem;
-              }
-              
-              .header h1 {
-                font-size: 1.4rem;
-              }
-              
-              .session-info {
-                font-size: 1rem;
-              }
-            }
-            
-            /* Small Mobile Devices */
-            @media (max-width: 480px) {
-              .seat-grid {
-                gap: 1rem;
-              }
-              
-              .student-name {
-                font-size: 1.4rem;
-              }
-              
-              .seat-card {
-                padding: 1.75rem 0.75rem;
-                min-height: 200px;
-              }
-              
-              .seat-number {
-                width: 48px;
-                height: 48px;
-                font-size: 1.2rem;
-                top: -18px;
-                left: -18px;
-              }
-              
-              .header h1 {
-                font-size: 1.3rem;
-              }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <!-- Header -->
-            <div class="header">
-              <div class="school-name">🏫 St. Anne's Academy</div>
-              <h1>📋 Classroom Seat Plan</h1>
-              <div class="session-info">${sessionInfo}</div>
-              <div class="date-info">${today}</div>
-            </div>
-            
-            <!-- Seat Grid -->
-            <div class="seat-grid">
-              ${seatArrangement.map((student, index) => {
-                const displayName = getSimplifiedName(student)
-                
-                return `
-                  <div class="seat-card">
-                    <div class="seat-number">${index + 1}</div>
-                    <div class="student-name">${displayName}</div>
-                    <div class="student-details">
-                      ${student.sex ? `${student.sex}` : 'Student'}
-                    </div>
-                    <div class="card-divider"></div>
-                    <div class="student-details">
-                      Seat #${index + 1}
-                    </div>
-                  </div>
-                `
-              }).join('')}
-            </div>
-            
-            <!-- Footer -->
-            <div class="footer">
-              <span>Total Students: ${seatArrangement.length}</span>
-              <span class="brand">EduScan Attendance System</span>
-              <span>Generated: ${new Date().toLocaleTimeString()}</span>
-            </div>
-          </div>
-        </body>
-        </html>
-      `
-      
-      printWindow.document.write(htmlContent)
-      printWindow.document.close()
-      
-      // Wait for content to load before printing
-      printWindow.onload = () => {
-        printWindow.print()
-        printWindow.close()
-      }
-      
-    } catch (error) {
-      console.error('Error generating seat plan:', error)
-      alert('Failed to generate seat plan')
-    } finally {
-      setDownloadingSeatPlan(false)
-    }
-  }
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -1622,35 +1262,17 @@ export default function QRScannerPage() {
         // Seat Plan View with Attendance Toolbar
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden" ref={seatPlanRef}>
           {/* Attendance Toolbar */}
-          <div className="border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white p-5">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                  <Grid className="w-5 h-5 text-blue-600" />
-                  Classroom Seat Plan
-                </h2>
-                <p className="text-sm text-gray-500 mt-1">
-                  {isMarkingMode 
-                    ? `✓ Marking: ${attendanceMode?.toUpperCase()} mode. Click on any student card.`
-                    : 'Select a mode (Present/Late/Absent), then click on student cards to mark attendance.'}
-                </p>
-              </div>
-              
-              {/* Download Button */}
-              {seatArrangement.length > 0 && (
-                <button
-                  onClick={downloadSeatPlan}
-                  disabled={downloadingSeatPlan}
-                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
-                >
-                  {downloadingSeatPlan ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Printer className="w-4 h-4" />
-                  )}
-                  Print/Download Seat Plan
-                </button>
-              )}
+          <div className="border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white p-4 sm:p-5">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                <Grid className="w-5 h-5 text-blue-600" />
+                Classroom Seat Plan
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">
+                {isMarkingMode 
+                  ? `✓ Marking: ${attendanceMode?.toUpperCase()} mode. Tap on any student card.`
+                  : 'Select Present/Late/Absent, then tap on student cards to mark attendance.'}
+              </p>
             </div>
 
             {/* Color Legend */}
@@ -1674,23 +1296,23 @@ export default function QRScannerPage() {
             </div>
 
             {/* Attendance Mode Buttons */}
-            <div className="mt-5 flex flex-wrap gap-3">
+            <div className="mt-4 flex flex-wrap gap-2">
               <button
                 onClick={() => {
                   setIsMarkingMode(true)
                   setAttendanceMode('present')
                   setSelectedStudentId(null)
                 }}
-                className={`flex-1 sm:flex-none px-6 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2 ${
+                className={`flex-1 sm:flex-none px-4 py-2.5 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2 text-sm ${
                   isMarkingMode && attendanceMode === 'present'
-                    ? 'bg-green-600 text-white shadow-lg shadow-green-200 ring-2 ring-green-500 ring-offset-2'
-                    : 'bg-green-100 text-green-700 hover:bg-green-200 hover:shadow-md'
+                    ? 'bg-green-600 text-white shadow-lg ring-2 ring-green-500 ring-offset-2'
+                    : 'bg-green-100 text-green-700 hover:bg-green-200'
                 }`}
               >
-                <CheckCircle className="w-5 h-5" />
-                Mark Present
+                <CheckCircle className="w-4 h-4" />
+                Present
                 {isMarkingMode && attendanceMode === 'present' && (
-                  <span className="ml-2 text-xs bg-green-700 px-2 py-0.5 rounded-full">ACTIVE</span>
+                  <span className="ml-1 text-xs bg-green-700 px-1.5 py-0.5 rounded-full">ACTIVE</span>
                 )}
               </button>
               <button
@@ -1699,16 +1321,16 @@ export default function QRScannerPage() {
                   setAttendanceMode('late')
                   setSelectedStudentId(null)
                 }}
-                className={`flex-1 sm:flex-none px-6 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2 ${
+                className={`flex-1 sm:flex-none px-4 py-2.5 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2 text-sm ${
                   isMarkingMode && attendanceMode === 'late'
-                    ? 'bg-yellow-600 text-white shadow-lg shadow-yellow-200 ring-2 ring-yellow-500 ring-offset-2'
-                    : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200 hover:shadow-md'
+                    ? 'bg-yellow-600 text-white shadow-lg ring-2 ring-yellow-500 ring-offset-2'
+                    : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
                 }`}
               >
-                <Clock className="w-5 h-5" />
-                Mark Late
+                <Clock className="w-4 h-4" />
+                Late
                 {isMarkingMode && attendanceMode === 'late' && (
-                  <span className="ml-2 text-xs bg-yellow-700 px-2 py-0.5 rounded-full">ACTIVE</span>
+                  <span className="ml-1 text-xs bg-yellow-700 px-1.5 py-0.5 rounded-full">ACTIVE</span>
                 )}
               </button>
               <button
@@ -1717,16 +1339,16 @@ export default function QRScannerPage() {
                   setAttendanceMode('absent')
                   setSelectedStudentId(null)
                 }}
-                className={`flex-1 sm:flex-none px-6 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2 ${
+                className={`flex-1 sm:flex-none px-4 py-2.5 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2 text-sm ${
                   isMarkingMode && attendanceMode === 'absent'
-                    ? 'bg-red-600 text-white shadow-lg shadow-red-200 ring-2 ring-red-500 ring-offset-2'
-                    : 'bg-red-100 text-red-700 hover:bg-red-200 hover:shadow-md'
+                    ? 'bg-red-600 text-white shadow-lg ring-2 ring-red-500 ring-offset-2'
+                    : 'bg-red-100 text-red-700 hover:bg-red-200'
                 }`}
               >
-                <XCircle className="w-5 h-5" />
-                Mark Absent
+                <XCircle className="w-4 h-4" />
+                Absent
                 {isMarkingMode && attendanceMode === 'absent' && (
-                  <span className="ml-2 text-xs bg-red-700 px-2 py-0.5 rounded-full">ACTIVE</span>
+                  <span className="ml-1 text-xs bg-red-700 px-1.5 py-0.5 rounded-full">ACTIVE</span>
                 )}
               </button>
               
@@ -1737,127 +1359,135 @@ export default function QRScannerPage() {
                     setAttendanceMode(null)
                     setSelectedStudentId(null)
                   }}
-                  className="px-6 py-3 rounded-xl font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 transition-all duration-200 flex items-center gap-2"
+                  className="px-4 py-2.5 rounded-xl font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 transition-all duration-200 flex items-center gap-2 text-sm"
                 >
-                  <XCircle className="w-5 h-5" />
-                  Cancel Mode
+                  <XCircle className="w-4 h-4" />
+                  Cancel
                 </button>
               )}
             </div>
 
             {!isMarkingMode && (
-              <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <div className="flex items-center gap-2 text-sm text-blue-700">
-                  <MousePointer className="w-4 h-4" />
-                  <span>Select a mode above, then click on any student card to mark attendance instantly.</span>
+              <div className="mt-3 p-2.5 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="flex items-center gap-2 text-xs text-blue-700">
+                  <MousePointer className="w-3 h-3" />
+                  <span>Select a mode above, then tap on any student card to mark attendance.</span>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Seat Plan Grid - Much Larger Cards */}
-          <div className="p-6">
+          {/* Seat Plan Grid - Truly Responsive Cards */}
+          <div className="p-4">
             {sectionStudents.length === 0 ? (
               <div className="text-center py-12">
                 <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                 <p className="text-gray-600">No students in this section</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-                {seatArrangement.map((student, index) => {
-                  const status = studentAttendanceStatus[student.id]
-                  const isMarked = !!status
-                  const displayName = getSimplifiedName(student)
-                  const isSelected = selectedStudentId === student.id
-                  
-                  return (
-                    <div
-                      key={student.id}
-                      onClick={() => handleStudentCardClick(student.id)}
-                      className={`relative group rounded-xl border-2 transition-all duration-200 cursor-pointer ${
-                        isMarked
-                          ? status === 'present'
-                            ? 'bg-gradient-to-br from-green-50 to-green-100 border-green-400 shadow-md'
-                            : status === 'late'
-                            ? 'bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-400 shadow-md'
-                            : 'bg-gradient-to-br from-red-50 to-red-100 border-red-400 shadow-md'
-                          : isSelected
-                          ? 'border-blue-400 bg-blue-50 shadow-md ring-2 ring-blue-300'
-                          : 'border-gray-200 bg-white hover:border-blue-300 hover:shadow-lg'
-                      } ${isMarkingMode && attendanceMode && !isMarked ? 'hover:scale-105 transition-transform' : ''}`}
-                    >
-                      {/* Seat Number Badge */}
-                      <div className="absolute -top-3 -left-3 w-10 h-10 rounded-full bg-gradient-to-br from-gray-700 to-gray-800 text-white text-base font-bold flex items-center justify-center shadow-lg">
-                        {index + 1}
-                      </div>
-                      
-                      <div className="p-5 pt-7">
-                        <div className="text-center">
-                          <p className="font-bold text-gray-800 text-lg leading-tight">
-                            {displayName}
-                          </p>
+              <>
+                {/* Responsive grid that works on all devices */}
+                <div className="grid grid-cols-1 gap-4">
+                  {seatArrangement.map((student, index) => {
+                    const status = studentAttendanceStatus[student.id]
+                    const isMarked = !!status
+                    const displayName = getSimplifiedName(student)
+                    const isSelected = selectedStudentId === student.id
+                    
+                    return (
+                      <div
+                        key={student.id}
+                        onClick={() => handleStudentCardClick(student.id)}
+                        className={`relative rounded-xl border-2 transition-all duration-200 cursor-pointer touch-manipulation ${
+                          isMarked
+                            ? status === 'present'
+                              ? 'bg-gradient-to-br from-green-50 to-green-100 border-green-400 shadow-md'
+                              : status === 'late'
+                              ? 'bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-400 shadow-md'
+                              : 'bg-gradient-to-br from-red-50 to-red-100 border-red-400 shadow-md'
+                            : isSelected
+                            ? 'border-blue-400 bg-blue-50 shadow-md ring-2 ring-blue-300'
+                            : 'border-gray-200 bg-white hover:border-blue-300 hover:shadow-lg'
+                        } ${isMarkingMode && attendanceMode && !isMarked ? 'active:scale-98 transition-transform' : ''}`}
+                      >
+                        {/* Seat Number Badge */}
+                        <div className="absolute -top-3 -left-3 w-10 h-10 rounded-full bg-gradient-to-br from-gray-700 to-gray-800 text-white text-base font-bold flex items-center justify-center shadow-lg z-10">
+                          {index + 1}
                         </div>
                         
-                        {/* Status Indicator */}
-                        {isMarked && (
-                          <div className="mt-4 pt-3 border-t border-current border-opacity-20">
-                            <div className={`text-center py-2 px-3 rounded-lg ${
-                              status === 'present' ? 'bg-green-200 text-green-800' :
-                              status === 'late' ? 'bg-yellow-200 text-yellow-800' :
-                              'bg-red-200 text-red-800'
-                            }`}>
-                              <span className="text-sm font-bold uppercase tracking-wide">
-                                {status}
-                              </span>
+                        <div className="p-5 pt-7">
+                          <div className="text-center">
+                            <p className="font-bold text-gray-800 text-xl md:text-2xl leading-tight break-words">
+                              {displayName}
+                            </p>
+                            {student.sex && (
+                              <p className="text-sm text-gray-500 mt-1">
+                                {student.sex}
+                              </p>
+                            )}
+                          </div>
+                          
+                          {/* Status Indicator */}
+                          {isMarked && (
+                            <div className="mt-4 pt-3 border-t border-current border-opacity-20">
+                              <div className={`text-center py-2 px-3 rounded-lg ${
+                                status === 'present' ? 'bg-green-200 text-green-800' :
+                                status === 'late' ? 'bg-yellow-200 text-yellow-800' :
+                                'bg-red-200 text-red-800'
+                              }`}>
+                                <span className="text-sm font-bold uppercase tracking-wide">
+                                  {status}
+                                </span>
+                              </div>
                             </div>
-                          </div>
-                        )}
-                        
-                        {/* Empty state placeholder for unmarked */}
-                        {!isMarked && isMarkingMode && attendanceMode && (
-                          <div className="mt-4 pt-3 text-center">
-                            <div className="text-sm text-gray-400 italic">Click to mark</div>
-                          </div>
-                        )}
-                        
-                        {/* Hover instruction for marking mode */}
-                        {isMarkingMode && attendanceMode && !isMarked && (
-                          <div className="absolute inset-0 bg-black/70 rounded-xl flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Fingerprint className="w-10 h-10 text-white mb-2" />
-                            <p className="text-white text-base font-medium">Click to mark</p>
-                            <p className="text-white text-sm capitalize mt-1">{attendanceMode}</p>
-                          </div>
-                        )}
+                          )}
+                          
+                          {/* Empty state placeholder for unmarked */}
+                          {!isMarked && isMarkingMode && attendanceMode && (
+                            <div className="mt-4 pt-3 text-center">
+                              <div className="text-sm text-gray-400 italic">Tap to mark</div>
+                            </div>
+                          )}
+                          
+                          {/* Hover/Tap instruction for marking mode */}
+                          {isMarkingMode && attendanceMode && !isMarked && (
+                            <div className="absolute inset-0 bg-black/70 rounded-xl flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Fingerprint className="w-10 h-10 text-white mb-2" />
+                              <p className="text-white text-base font-medium">Tap to mark</p>
+                              <p className="text-white text-sm capitalize mt-1">{attendanceMode}</p>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )
-                })}
-              </div>
+                    )
+                  })}
+                </div>
+              </>
             )}
             
             {/* Summary Stats */}
             {sectionStudents.length > 0 && (
-              <div className="mt-8 pt-6 border-t border-gray-200">
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                  <div className="bg-blue-50 rounded-lg p-3 text-center">
-                    <p className="text-xs text-gray-600">Total Students</p>
-                    <p className="text-2xl font-bold text-blue-600 mt-1">{sectionStudents.length}</p>
+              <div className="mt-6 pt-4 border-t border-gray-200">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                  <div className="bg-blue-50 rounded-lg p-2 text-center">
+                    <p className="text-xs text-gray-600">Total</p>
+                    <p className="text-xl font-bold text-blue-600">{sectionStudents.length}</p>
                   </div>
-                  <div className="bg-green-50 rounded-lg p-3 text-center">
+                  <div className="bg-green-50 rounded-lg p-2 text-center">
                     <p className="text-xs text-gray-600">Present</p>
-                    <p className="text-2xl font-bold text-green-600 mt-1">{stats.presentCount}</p>
+                    <p className="text-xl font-bold text-green-600">{stats.presentCount}</p>
                   </div>
-                  <div className="bg-yellow-50 rounded-lg p-3 text-center">
+                  <div className="bg-yellow-50 rounded-lg p-2 text-center">
                     <p className="text-xs text-gray-600">Late</p>
-                    <p className="text-2xl font-bold text-yellow-600 mt-1">{stats.lateCount}</p>
+                    <p className="text-xl font-bold text-yellow-600">{stats.lateCount}</p>
                   </div>
-                  <div className="bg-red-50 rounded-lg p-3 text-center">
+                  <div className="bg-red-50 rounded-lg p-2 text-center">
                     <p className="text-xs text-gray-600">Absent</p>
-                    <p className="text-2xl font-bold text-red-600 mt-1">{stats.absentCount}</p>
+                    <p className="text-xl font-bold text-red-600">{stats.absentCount}</p>
                   </div>
-                  <div className="bg-purple-50 rounded-lg p-3 text-center">
-                    <p className="text-xs text-gray-600">Completion</p>
-                    <p className="text-2xl font-bold text-purple-600 mt-1">
+                  <div className="bg-purple-50 rounded-lg p-2 text-center col-span-2 sm:col-span-1">
+                    <p className="text-xs text-gray-600">Complete</p>
+                    <p className="text-xl font-bold text-purple-600">
                       {Math.round(((stats.presentCount + stats.lateCount + stats.absentCount) / sectionStudents.length) * 100)}%
                     </p>
                   </div>
@@ -1874,9 +1504,8 @@ export default function QRScannerPage() {
           <div>
             <h3 className="font-medium text-blue-800">Secure Attendance System</h3>
             <p className="text-sm text-blue-700 mt-1">
-              QR codes are encrypted end-to-end. Seat plan mode: select Present/Late/Absent, then click on student cards.
+              QR codes are encrypted end-to-end. Seat plan mode: select Present/Late/Absent, then tap on student cards.
               {activeTab === 'seatplan' && !isMarkingMode && " Select a mode above to start marking."}
-              You can also print or download the seat plan using the button above.
             </p>
           </div>
         </div>
@@ -1889,6 +1518,12 @@ export default function QRScannerPage() {
         }
         .animate-scan {
           animation: scan 2s linear infinite;
+        }
+        .active\\:scale-98:active {
+          transform: scale(0.98);
+        }
+        .touch-manipulation {
+          touch-action: manipulation;
         }
       `}</style>
     </div>
