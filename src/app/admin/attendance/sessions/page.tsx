@@ -26,7 +26,8 @@ import {
   FileText,
   MessageSquare,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Info  
 } from 'lucide-react'
 
 interface AttendanceSession {
