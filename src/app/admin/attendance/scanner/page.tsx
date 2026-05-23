@@ -998,10 +998,12 @@ export default function QRScannerPage() {
         <html>
         <head>
           <title>Seat Plan - ${sessionInfo}</title>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>
             @page {
               size: landscape;
-              margin: 1.5cm;
+              margin: 1cm;
             }
             
             * {
@@ -1011,9 +1013,10 @@ export default function QRScannerPage() {
             }
             
             body {
-              font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Tahoma, Geneva, Verdana, sans-serif;
+              font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Roboto', 'Helvetica Neue', sans-serif;
               background: white;
               color: #1f2937;
+              padding: 20px;
             }
             
             .container {
@@ -1021,188 +1024,143 @@ export default function QRScannerPage() {
               margin: 0 auto;
             }
             
-            /* Elegant Header */
+            /* Header Styles */
             .header {
               text-align: center;
-              margin-bottom: 2.5rem;
-              padding-bottom: 1.5rem;
-              border-bottom: 3px solid #e5e7eb;
+              margin-bottom: 2rem;
+              padding-bottom: 1rem;
             }
             
-            .header .school-name {
-              font-size: 1.5rem;
-              font-weight: 700;
+            .school-name {
+              font-size: 1.3rem;
+              font-weight: 600;
               color: #1e40af;
-              letter-spacing: -0.5px;
-              margin-bottom: 0.5rem;
+              letter-spacing: -0.3px;
+              margin-bottom: 0.3rem;
             }
             
             .header h1 {
-              font-size: 1.75rem;
-              font-weight: 800;
+              font-size: 1.8rem;
+              font-weight: 700;
               color: #111827;
-              margin-bottom: 0.5rem;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              gap: 0.5rem;
+              margin-bottom: 0.3rem;
             }
             
-            .header .session-info {
+            .session-info {
               font-size: 1.1rem;
               color: #4b5563;
-              font-weight: 600;
+              font-weight: 500;
+              margin-top: 0.2rem;
             }
             
-            .header .date-info {
-              font-size: 0.9rem;
+            .date-info {
+              font-size: 0.85rem;
               color: #6b7280;
-              margin-top: 0.25rem;
+              margin-top: 0.2rem;
             }
             
-            .header .stats-row {
-              display: flex;
-              justify-content: center;
-              gap: 2rem;
-              margin-top: 1rem;
-              font-size: 0.9rem;
-              color: #6b7280;
-            }
-            
-            .header .stat-item {
-              display: flex;
-              align-items: center;
-              gap: 0.5rem;
-            }
-            
-            .header .stat-dot {
-              width: 10px;
-              height: 10px;
-              border-radius: 50%;
-              display: inline-block;
-            }
-            
-            .stat-dot.present { background: #10b981; }
-            .stat-dot.late { background: #f59e0b; }
-            .stat-dot.absent { background: #ef4444; }
-            .stat-dot.unmarked { background: #d1d5db; }
-            
-            /* Seat Grid - Auto-fill responsive */
+            /* Seat Grid - Responsive with larger cards */
             .seat-grid {
               display: grid;
-              grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-              gap: 1.25rem;
+              grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+              gap: 1.5rem;
               padding: 0.5rem;
+              margin-top: 1.5rem;
             }
             
-            /* Elegant Seat Card */
+            /* Elegant Seat Card - Larger Size */
             .seat-card {
               background: white;
               border: 2px solid #e5e7eb;
-              border-radius: 16px;
-              padding: 1.25rem 1rem;
+              border-radius: 20px;
+              padding: 1.75rem 1rem;
               text-align: center;
               position: relative;
               page-break-inside: avoid;
               break-inside: avoid;
+              box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
               transition: all 0.2s;
-              min-height: 100px;
+              min-height: 130px;
               display: flex;
               flex-direction: column;
               align-items: center;
               justify-content: center;
             }
             
-            /* Seat Number Badge */
+            /* Seat Number Badge - More prominent */
             .seat-number {
               position: absolute;
-              top: -12px;
-              left: -12px;
-              width: 32px;
-              height: 32px;
-              background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
+              top: -14px;
+              left: -14px;
+              width: 36px;
+              height: 36px;
+              background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
               color: white;
               border-radius: 50%;
               display: flex;
               align-items: center;
               justify-content: center;
-              font-size: 0.8rem;
-              font-weight: 700;
-              box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+              font-size: 0.9rem;
+              font-weight: 800;
+              box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
               border: 2px solid white;
             }
             
-            /* Student Name */
+            /* Student Name - Larger text */
             .student-name {
-              font-size: 1rem;
+              font-size: 1.1rem;
               font-weight: 700;
               color: #111827;
               margin-bottom: 0.5rem;
               word-break: break-word;
-              line-height: 1.3;
+              line-height: 1.4;
+            }
+            
+            /* Student Details */
+            .student-details {
+              font-size: 0.75rem;
+              color: #9ca3af;
+              margin-top: 0.25rem;
             }
             
             .student-lrn {
-              font-size: 0.75rem;
+              font-size: 0.7rem;
               color: #9ca3af;
-              margin-bottom: 0.75rem;
+              font-family: monospace;
+              letter-spacing: 0.5px;
             }
             
-            /* Status Strip - Clean and minimal */
-            .status-strip {
-              width: 100%;
-              height: 4px;
-              border-radius: 2px;
-              margin-top: auto;
+            /* Simple divider line (no status colors) */
+            .card-divider {
+              width: 80%;
+              height: 2px;
+              background: #e5e7eb;
+              margin: 0.75rem auto 0.5rem;
+              border-radius: 1px;
             }
             
-            .status-strip.present { background: #10b981; }
-            .status-strip.late { background: #f59e0b; }
-            .status-strip.absent { background: #ef4444; }
-            .status-strip.unmarked { background: #e5e7eb; }
-            
-            /* Legend */
-            .legend {
-              display: flex;
-              justify-content: center;
-              gap: 2rem;
-              margin-top: 2rem;
-              padding: 1rem 1.5rem;
-              background: #f9fafb;
-              border-radius: 12px;
-              border: 1px solid #e5e7eb;
-            }
-            
-            .legend-item {
-              display: flex;
-              align-items: center;
-              gap: 0.5rem;
-              font-size: 0.85rem;
-              color: #4b5563;
+            /* Simple status text - neutral, no colored badges */
+            .status-text {
+              font-size: 0.7rem;
+              color: #9ca3af;
               font-weight: 500;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
             }
-            
-            .legend-dot {
-              width: 12px;
-              height: 12px;
-              border-radius: 4px;
-            }
-            
-            .legend-dot.present { background: #10b981; }
-            .legend-dot.late { background: #f59e0b; }
-            .legend-dot.absent { background: #ef4444; }
             
             /* Footer */
             .footer {
-              margin-top: 2.5rem;
-              padding-top: 1.5rem;
+              margin-top: 2rem;
+              padding-top: 1rem;
               border-top: 2px solid #f3f4f6;
               text-align: center;
-              font-size: 0.8rem;
+              font-size: 0.75rem;
               color: #9ca3af;
               display: flex;
               justify-content: space-between;
               align-items: center;
+              flex-wrap: wrap;
+              gap: 0.5rem;
             }
             
             .footer .brand {
@@ -1210,16 +1168,69 @@ export default function QRScannerPage() {
               color: #1e40af;
             }
             
+            /* Print-specific optimizations */
             @media print {
               body {
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
+                padding: 0;
+                margin: 0;
               }
               
               .seat-card {
                 break-inside: avoid;
                 page-break-inside: avoid;
                 border-color: #d1d5db;
+                box-shadow: none;
+              }
+              
+              .seat-grid {
+                gap: 1.2rem;
+              }
+            }
+            
+            /* Responsive adjustments */
+            @media (max-width: 768px) {
+              .seat-grid {
+                grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+                gap: 1rem;
+              }
+              
+              .student-name {
+                font-size: 0.95rem;
+              }
+              
+              .seat-card {
+                padding: 1.25rem 0.75rem;
+                min-height: 110px;
+              }
+              
+              .seat-number {
+                width: 30px;
+                height: 30px;
+                font-size: 0.8rem;
+                top: -12px;
+                left: -12px;
+              }
+              
+              .header h1 {
+                font-size: 1.4rem;
+              }
+            }
+            
+            @media (max-width: 480px) {
+              .seat-grid {
+                grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+                gap: 0.8rem;
+              }
+              
+              .student-name {
+                font-size: 0.85rem;
+              }
+              
+              .seat-card {
+                padding: 1rem 0.5rem;
+                min-height: 95px;
               }
             }
           </style>
@@ -1228,64 +1239,31 @@ export default function QRScannerPage() {
           <div class="container">
             <!-- Header -->
             <div class="header">
-              <div class="school-name">St. Anne's Academy</div>
-              <h1>
-                📋 Classroom Seat Plan
-              </h1>
+              <div class="school-name">🏫 St. Anne's Academy</div>
+              <h1>📋 Classroom Seat Plan</h1>
               <div class="session-info">${sessionInfo}</div>
               <div class="date-info">${today}</div>
-              <div class="stats-row">
-                <div class="stat-item">
-                  <span class="stat-dot present"></span>
-                  Present: ${seatArrangement.filter(s => studentAttendanceStatus[s.id] === 'present').length}
-                </div>
-                <div class="stat-item">
-                  <span class="stat-dot late"></span>
-                  Late: ${seatArrangement.filter(s => studentAttendanceStatus[s.id] === 'late').length}
-                </div>
-                <div class="stat-item">
-                  <span class="stat-dot absent"></span>
-                  Absent: ${seatArrangement.filter(s => studentAttendanceStatus[s.id] === 'absent').length}
-                </div>
-                <div class="stat-item">
-                  <span class="stat-dot unmarked"></span>
-                  Pending: ${seatArrangement.filter(s => !studentAttendanceStatus[s.id]).length}
-                </div>
-              </div>
             </div>
             
             <!-- Seat Grid -->
             <div class="seat-grid">
               ${seatArrangement.map((student, index) => {
-                const status = studentAttendanceStatus[student.id]
                 const displayName = getSimplifiedName(student)
-                const statusClass = status || 'unmarked'
                 
                 return `
                   <div class="seat-card">
                     <div class="seat-number">${index + 1}</div>
                     <div class="student-name">${displayName}</div>
-                    ${status ? `<div class="student-lrn">LRN: ${student.lrn}</div>` : ''}
-                    <div class="status-strip ${statusClass}"></div>
+                    <div class="student-details">
+                      ${student.sex ? `<span>${student.sex}</span>` : ''}
+                    </div>
+                    <div class="card-divider"></div>
+                    <div class="status-text">
+                      Seat #${index + 1}
+                    </div>
                   </div>
                 `
               }).join('')}
-            </div>
-            
-            <!-- Legend -->
-            <div class="legend">
-              <div class="legend-item">
-                <div class="legend-dot present"></div>
-                Present
-              </div>
-              <div class="legend-item">
-                <div class="legend-dot late"></div>
-                Late
-              </div>
-              <div class="legend-item">
-                <div class="legend-dot absent"></div>
-                Absent
-              </div>
             </div>
             
             <!-- Footer -->
