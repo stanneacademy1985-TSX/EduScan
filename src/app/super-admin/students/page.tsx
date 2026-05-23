@@ -22,7 +22,6 @@ import {
   UserX,
   CheckCircle,
   AlertCircle,
-  RefreshCw,
   Eye,
   Pencil,
   MoreVertical,
@@ -32,7 +31,9 @@ import {
 interface Student {
   id: string
   lrn: string
-  full_name: string
+  first_name: string
+  middle_name: string
+  last_name: string
   email: string
   grade: string
   section: string
@@ -46,7 +47,9 @@ interface Student {
 
 interface Teacher {
   id: string
-  full_name: string
+  first_name: string
+  middle_name: string
+  last_name: string
   assigned_grade: string
 }
 
@@ -55,31 +58,9 @@ interface StudentTeacherAssignment {
   teacher_id: string
 }
 
-type StudentRow = Omit<Student, 'is_assigned' | 'teacher_name'>
-
-// Helper function to format name with proper capitalization and middle initial
-const formatFullName = (fullName: string): string => {
-  if (!fullName) return ''
-  
-  const nameParts = fullName.trim().split(/\s+/)
-  
-  if (nameParts.length === 1) {
-    return capitalizeName(nameParts[0])
-  } else if (nameParts.length === 2) {
-    return `${capitalizeName(nameParts[0])} ${capitalizeName(nameParts[1])}`
-  } else if (nameParts.length >= 3) {
-    const firstName = capitalizeName(nameParts[0])
-    const middleInitial = nameParts[1].charAt(0).toUpperCase()
-    const lastName = capitalizeName(nameParts[nameParts.length - 1])
-    return `${firstName} ${middleInitial}. ${lastName}`
-  }
-  
-  return capitalizeName(fullName)
-}
-
 // Helper function to capitalize first letter of each word
 const capitalizeName = (name: string): string => {
-  if (!name) return name
+  if (!name) return ''
   return name
     .toLowerCase()
     .split(' ')
@@ -87,23 +68,38 @@ const capitalizeName = (name: string): string => {
     .join(' ')
 }
 
-// Helper function to format name for storage
-const formatNameForStorage = (firstName: string, middleName: string, lastName: string): string => {
+// Format full name for display: "First M. Last" or "First Last" if no middle name
+const formatFullName = (firstName: string, middleName: string, lastName: string): string => {
+  const first = capitalizeName(firstName)
+  const last = capitalizeName(lastName)
+  
+  if (middleName && middleName.trim()) {
+    // Get first letter of middle name for initial
+    const middleInitial = middleName.trim().charAt(0).toUpperCase()
+    return `${first} ${middleInitial}. ${last}`
+  }
+  return `${first} ${last}`
+}
+
+// Format teacher name for display
+const formatTeacherName = (firstName: string, middleName: string, lastName: string): string => {
+  const first = capitalizeName(firstName)
+  const last = capitalizeName(lastName)
+  
+  if (middleName && middleName.trim()) {
+    const middleInitial = middleName.trim().charAt(0).toUpperCase()
+    return `${first} ${middleInitial}. ${last}`
+  }
+  return `${first} ${last}`
+}
+
+// Get full name string for storage/display
+const getFullNameString = (firstName: string, middleName: string, lastName: string): string => {
   const parts = []
   if (firstName) parts.push(capitalizeName(firstName))
   if (middleName) parts.push(capitalizeName(middleName))
   if (lastName) parts.push(capitalizeName(lastName))
   return parts.join(' ')
-}
-
-// Helper to parse full name into parts
-const parseFullName = (fullName: string) => {
-  const parts = fullName.trim().split(/\s+/)
-  return {
-    firstName: parts[0] || '',
-    middleName: parts.length > 2 ? parts.slice(1, -1).join(' ') : '',
-    lastName: parts.length > 1 ? parts[parts.length - 1] : ''
-  }
 }
 
 export default function SuperAdminStudentsPage() {
@@ -134,11 +130,6 @@ export default function SuperAdminStudentsPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [studentToDelete, setStudentToDelete] = useState<Student | null>(null)
 
-  // Edit form state
-  const [editFirstName, setEditFirstName] = useState('')
-  const [editMiddleName, setEditMiddleName] = useState('')
-  const [editLastName, setEditLastName] = useState('')
-
   const itemsPerPage = 10
 
   useEffect(() => {
@@ -161,22 +152,32 @@ export default function SuperAdminStudentsPage() {
     try {
       setLoading(true)
       
+      // Fetch all students with separate name fields
       const { data: studentsData, error: studentsError } = await supabase
         .from('students')
-        .select('id, lrn, full_name, email, grade, section, contact_number, profile_photo_url, profile_photo_base64')
+        .select('id, lrn, first_name, middle_name, last_name, email, grade, section, contact_number, profile_photo_url, profile_photo_base64')
         .in('grade', ['11', '12'])
-        .order('full_name')
+        .order('first_name')
 
       if (studentsError) throw studentsError
 
+      // Fetch all teachers with separate name fields
       const { data: teachersData, error: teachersError } = await supabase
         .from('admin_users')
-        .select('id, full_name, assigned_grade')
+        .select('id, first_name, middle_name, last_name, assigned_grade')
         .in('role', ['admin', 'teacher'])
 
       if (teachersError) throw teachersError
-      setTeachers(teachersData || [])
+      
+      const formattedTeachers = (teachersData || []).map((teacher: any) => ({
+        ...teacher,
+        first_name: teacher.first_name || '',
+        middle_name: teacher.middle_name || '',
+        last_name: teacher.last_name || ''
+      }))
+      setTeachers(formattedTeachers)
 
+      // Fetch student-teacher assignments
       const { data: assignments, error: assignmentsError } = await supabase
         .from('student_teacher_assignments')
         .select('student_id, teacher_id')
@@ -188,19 +189,19 @@ export default function SuperAdminStudentsPage() {
         assignmentMap.set(assign.student_id, assign.teacher_id)
       })
 
-      const teacherNameMap = new Map()
-      teachersData?.forEach((teacher: Teacher) => {
-        teacherNameMap.set(teacher.id, formatFullName(teacher.full_name))
-      })
-
-      const studentsWithAssignment = (studentsData || []).map((student: StudentRow) => {
+      // Combine data
+      const studentsWithAssignment = (studentsData || []).map((student: any) => {
         const teacherId = assignmentMap.get(student.id)
+        const teacher = formattedTeachers.find(t => t.id === teacherId)
+        
         return {
           ...student,
-          full_name: formatFullName(student.full_name),
+          first_name: student.first_name || '',
+          middle_name: student.middle_name || '',
+          last_name: student.last_name || '',
           is_assigned: !!teacherId,
           teacher_id: teacherId,
-          teacher_name: teacherId ? teacherNameMap.get(teacherId) : undefined
+          teacher_name: teacher ? formatTeacherName(teacher.first_name, teacher.middle_name, teacher.last_name) : undefined
         }
       })
 
@@ -221,7 +222,9 @@ export default function SuperAdminStudentsPage() {
     if (searchTerm) {
       const term = searchTerm.toLowerCase()
       filtered = filtered.filter(student =>
-        student.full_name.toLowerCase().includes(term) ||
+        student.first_name.toLowerCase().includes(term) ||
+        student.last_name.toLowerCase().includes(term) ||
+        `${student.first_name} ${student.last_name}`.toLowerCase().includes(term) ||
         student.lrn.includes(term) ||
         student.email.toLowerCase().includes(term)
       )
@@ -270,11 +273,15 @@ export default function SuperAdminStudentsPage() {
 
   const handleEditClick = (student: Student) => {
     setSelectedStudent(student)
-    const { firstName, middleName, lastName } = parseFullName(student.full_name)
-    setEditFirstName(firstName)
-    setEditMiddleName(middleName)
-    setEditLastName(lastName)
-    setEditedStudent(student)
+    setEditedStudent({
+      first_name: student.first_name,
+      middle_name: student.middle_name,
+      last_name: student.last_name,
+      email: student.email,
+      contact_number: student.contact_number,
+      grade: student.grade,
+      section: student.section,
+    })
     setShowEditModal(true)
     setOpenActionMenuId(null)
   }
@@ -282,14 +289,14 @@ export default function SuperAdminStudentsPage() {
   const handleEditSave = async () => {
     if (!selectedStudent) return
 
-    const formattedFullName = formatNameForStorage(editFirstName, editMiddleName, editLastName)
-
     setSavingStudent(true)
     try {
       const { error } = await supabase
         .from('students')
         .update({
-          full_name: formattedFullName,
+          first_name: capitalizeName(editedStudent.first_name || ''),
+          middle_name: capitalizeName(editedStudent.middle_name || ''),
+          last_name: capitalizeName(editedStudent.last_name || ''),
           email: editedStudent.email,
           contact_number: editedStudent.contact_number,
           grade: editedStudent.grade,
@@ -299,17 +306,23 @@ export default function SuperAdminStudentsPage() {
 
       if (error) throw error
 
-      const formattedDisplayName = formatFullName(formattedFullName)
+      // Update local state
+      const updatedStudent = {
+        ...selectedStudent,
+        first_name: capitalizeName(editedStudent.first_name || ''),
+        middle_name: capitalizeName(editedStudent.middle_name || ''),
+        last_name: capitalizeName(editedStudent.last_name || ''),
+        email: editedStudent.email || '',
+        contact_number: editedStudent.contact_number || '',
+        grade: editedStudent.grade || '',
+        section: editedStudent.section || '',
+      }
 
       setStudents(prev => prev.map(student => 
-        student.id === selectedStudent.id
-          ? { ...student, ...editedStudent, full_name: formattedDisplayName } as Student
-          : student
+        student.id === selectedStudent.id ? updatedStudent : student
       ))
       setFilteredStudents(prev => prev.map(student => 
-        student.id === selectedStudent.id
-          ? { ...student, ...editedStudent, full_name: formattedDisplayName } as Student
-          : student
+        student.id === selectedStudent.id ? updatedStudent : student
       ))
 
       setMessage({ type: 'success', text: 'Student updated successfully' })
@@ -357,17 +370,23 @@ export default function SuperAdminStudentsPage() {
   }
 
   const handleExportCSV = () => {
-    const headers = ['LRN', 'Full Name', 'Email', 'Grade', 'Contact', 'Assigned Teacher', 'Status']
+    const headers = ['LRN', 'First Name', 'Middle Name', 'Last Name', 'Full Name', 'Email', 'Grade', 'Contact', 'Assigned Teacher', 'Status']
     
-    const csvData = filteredStudents.map(student => [
-      `="${student.lrn}"`,
-      student.full_name,
-      student.email,
-      student.grade,
-      student.contact_number,
-      student.teacher_name || 'Unassigned',
-      student.is_assigned ? 'Assigned' : 'Unassigned'
-    ])
+    const csvData = filteredStudents.map(student => {
+      const fullName = formatFullName(student.first_name, student.middle_name, student.last_name)
+      return [
+        `="${student.lrn}"`,
+        student.first_name,
+        student.middle_name || '',
+        student.last_name,
+        fullName,
+        student.email,
+        student.grade,
+        student.contact_number,
+        student.teacher_name || 'Unassigned',
+        student.is_assigned ? 'Assigned' : 'Unassigned'
+      ]
+    })
 
     const BOM = "\uFEFF"
     const csvContent = [
@@ -523,7 +542,7 @@ export default function SuperAdminStudentsPage() {
             <option value="all">All Teachers</option>
             {teachers.map(teacher => (
               <option key={teacher.id} value={teacher.id}>
-                {formatFullName(teacher.full_name)}
+                {formatTeacherName(teacher.first_name, teacher.middle_name, teacher.last_name)}
                 {teacher.assigned_grade && ` (Grade ${teacher.assigned_grade})`}
               </option>
             ))}
@@ -602,110 +621,113 @@ export default function SuperAdminStudentsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {paginatedStudents.map((student) => (
-                    <tr key={student.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center overflow-hidden">
-                            {student.profile_photo_base64 || student.profile_photo_url ? (
-                              <img
-                                src={student.profile_photo_base64 || student.profile_photo_url || ''}
-                                alt={student.full_name}
-                                className="w-10 h-10 object-cover"
-                              />
-                            ) : (
-                              <User className="w-5 h-5 text-indigo-600" />
-                            )}
+                  {paginatedStudents.map((student) => {
+                    const displayName = formatFullName(student.first_name, student.middle_name, student.last_name)
+                    return (
+                      <tr key={student.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center overflow-hidden">
+                              {student.profile_photo_base64 || student.profile_photo_url ? (
+                                <img
+                                  src={student.profile_photo_base64 || student.profile_photo_url || ''}
+                                  alt={displayName}
+                                  className="w-10 h-10 object-cover"
+                                />
+                              ) : (
+                                <User className="w-5 h-5 text-indigo-600" />
+                              )}
+                            </div>
+                            <div>
+                              <p className="font-medium text-gray-800">{displayName}</p>
+                              <p className="text-xs text-gray-500">{student.email}</p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="font-medium text-gray-800">{student.full_name}</p>
-                            <p className="text-xs text-gray-500">{student.email}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded">
-                          {student.lrn}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-1">
-                          <GraduationCap className="w-4 h-4 text-gray-400" />
-                          <span className="text-sm">
-                            Grade {student.grade}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded">
+                            {student.lrn}
                           </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-1">
-                          <Phone className="w-4 h-4 text-gray-400" />
-                          <span className="text-sm">{student.contact_number || 'N/A'}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        {student.is_assigned ? (
+                        </td>
+                        <td className="px-6 py-4">
                           <div className="flex items-center gap-1">
-                            <UserCheck className="w-4 h-4 text-green-500" />
-                            <span className="text-sm text-gray-700">{student.teacher_name}</span>
+                            <GraduationCap className="w-4 h-4 text-gray-400" />
+                            <span className="text-sm">
+                              Grade {student.grade}
+                            </span>
                           </div>
-                        ) : (
-                          <span className="text-sm text-orange-600 flex items-center gap-1">
-                            <UserX className="w-4 h-4" />
-                            Unassigned
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        {student.is_assigned ? (
-                          <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
-                            Assigned
-                          </span>
-                        ) : (
-                          <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-medium">
-                            Unassigned
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex justify-end items-center gap-2 relative">
-                          <div className="relative">
-                            <button
-                              onClick={() => setOpenActionMenuId(prev => prev === student.id ? null : student.id)}
-                              className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 transition-colors flex items-center gap-1"
-                            >
-                              <MoreVertical className="w-3 h-3" />
-                              Actions
-                            </button>
-                            {openActionMenuId === student.id && (
-                              <div className="absolute right-0 mt-2 w-40 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-20">
-                                <button
-                                  onClick={() => handleViewStudent(student)}
-                                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                                >
-                                  <Eye className="w-4 h-4" />
-                                  View
-                                </button>
-                                <button
-                                  onClick={() => handleEditClick(student)}
-                                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                                >
-                                  <Pencil className="w-4 h-4" />
-                                  Edit
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteClick(student)}
-                                  className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                  Delete
-                                </button>
-                              </div>
-                            )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-1">
+                            <Phone className="w-4 h-4 text-gray-400" />
+                            <span className="text-sm">{student.contact_number || 'N/A'}</span>
                           </div>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="px-6 py-4">
+                          {student.is_assigned ? (
+                            <div className="flex items-center gap-1">
+                              <UserCheck className="w-4 h-4 text-green-500" />
+                              <span className="text-sm text-gray-700">{student.teacher_name}</span>
+                            </div>
+                          ) : (
+                            <span className="text-sm text-orange-600 flex items-center gap-1">
+                              <UserX className="w-4 h-4" />
+                              Unassigned
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          {student.is_assigned ? (
+                            <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+                              Assigned
+                            </span>
+                          ) : (
+                            <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-medium">
+                              Unassigned
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex justify-end items-center gap-2 relative">
+                            <div className="relative">
+                              <button
+                                onClick={() => setOpenActionMenuId(prev => prev === student.id ? null : student.id)}
+                                className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 transition-colors flex items-center gap-1"
+                              >
+                                <MoreVertical className="w-3 h-3" />
+                                Actions
+                              </button>
+                              {openActionMenuId === student.id && (
+                                <div className="absolute right-0 mt-2 w-40 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-20">
+                                  <button
+                                    onClick={() => handleViewStudent(student)}
+                                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                  >
+                                    <Eye className="w-4 h-4" />
+                                    View
+                                  </button>
+                                  <button
+                                    onClick={() => handleEditClick(student)}
+                                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                  >
+                                    <Pencil className="w-4 h-4" />
+                                    Edit
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteClick(student)}
+                                    className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                    Delete
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -755,7 +777,7 @@ export default function SuperAdminStudentsPage() {
             <div className="p-6 border-b border-gray-200">
               <h2 className="text-xl font-bold text-gray-800">Assign Student to Teacher</h2>
               <p className="text-sm text-gray-500 mt-1">
-                {selectedStudent.full_name} (Grade {selectedStudent.grade})
+                {formatFullName(selectedStudent.first_name, selectedStudent.middle_name, selectedStudent.last_name)} (Grade {selectedStudent.grade})
               </p>
             </div>
 
@@ -772,7 +794,7 @@ export default function SuperAdminStudentsPage() {
                   <option value="">Choose a teacher...</option>
                   {teachers.map(teacher => (
                     <option key={teacher.id} value={teacher.id}>
-                      {formatFullName(teacher.full_name)}
+                      {formatTeacherName(teacher.first_name, teacher.middle_name, teacher.last_name)}
                       {teacher.assigned_grade && ` (Grade ${teacher.assigned_grade})`}
                     </option>
                   ))}
@@ -823,7 +845,9 @@ export default function SuperAdminStudentsPage() {
               </button>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-              <div><span className="text-gray-500">Name:</span> <span className="font-medium text-gray-800">{viewStudent.full_name}</span></div>
+              <div><span className="text-gray-500">First Name:</span> <span className="font-medium text-gray-800">{viewStudent.first_name}</span></div>
+              <div><span className="text-gray-500">Middle Name:</span> <span className="font-medium text-gray-800">{viewStudent.middle_name || 'N/A'}</span></div>
+              <div><span className="text-gray-500">Last Name:</span> <span className="font-medium text-gray-800">{viewStudent.last_name}</span></div>
               <div><span className="text-gray-500">LRN:</span> <span className="font-medium text-gray-800">{viewStudent.lrn}</span></div>
               <div><span className="text-gray-500">Email:</span> <span className="font-medium text-gray-800">{viewStudent.email || 'N/A'}</span></div>
               <div><span className="text-gray-500">Contact:</span> <span className="font-medium text-gray-800">{viewStudent.contact_number || 'N/A'}</span></div>
@@ -856,30 +880,30 @@ export default function SuperAdminStudentsPage() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <label className="block text-sm">
-                <span className="text-gray-700 font-medium">First Name</span>
+                <span className="text-gray-700 font-medium">First Name *</span>
                 <input 
-                  value={editFirstName} 
-                  onChange={(e) => setEditFirstName(e.target.value)} 
+                  value={editedStudent.first_name || ''} 
+                  onChange={(e) => setEditedStudent(prev => ({ ...prev, first_name: e.target.value }))} 
                   className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg" 
-                  placeholder="First Name"
+                  placeholder="First Name (e.g., Mark Joheun)"
                 />
               </label>
               <label className="block text-sm">
                 <span className="text-gray-700 font-medium">Middle Name</span>
                 <input 
-                  value={editMiddleName} 
-                  onChange={(e) => setEditMiddleName(e.target.value)} 
+                  value={editedStudent.middle_name || ''} 
+                  onChange={(e) => setEditedStudent(prev => ({ ...prev, middle_name: e.target.value }))} 
                   className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg" 
-                  placeholder="Middle Name"
+                  placeholder="Middle Name (optional)"
                 />
               </label>
               <label className="block text-sm">
-                <span className="text-gray-700 font-medium">Last Name</span>
+                <span className="text-gray-700 font-medium">Last Name *</span>
                 <input 
-                  value={editLastName} 
-                  onChange={(e) => setEditLastName(e.target.value)} 
+                  value={editedStudent.last_name || ''} 
+                  onChange={(e) => setEditedStudent(prev => ({ ...prev, last_name: e.target.value }))} 
                   className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg" 
-                  placeholder="Last Name"
+                  placeholder="Last Name (e.g., Kim)"
                 />
               </label>
               <label className="block text-sm">
@@ -915,6 +939,7 @@ export default function SuperAdminStudentsPage() {
                   value={editedStudent.section || ''} 
                   onChange={(e) => setEditedStudent(prev => ({ ...prev, section: e.target.value }))} 
                   className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg" 
+                  placeholder="Section"
                 />
               </label>
             </div>
@@ -941,7 +966,7 @@ export default function SuperAdminStudentsPage() {
               </div>
               <h3 className="text-xl font-bold text-gray-800 mb-2">Delete Student</h3>
               <p className="text-gray-600 mb-6">
-                Are you sure you want to delete {studentToDelete.full_name}? This action cannot be undone.
+                Are you sure you want to delete {formatFullName(studentToDelete.first_name, studentToDelete.middle_name, studentToDelete.last_name)}? This action cannot be undone.
               </p>
               <div className="flex flex-col sm:flex-row gap-3">
                 <button
