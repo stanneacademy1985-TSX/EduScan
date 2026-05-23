@@ -117,6 +117,30 @@ export default function RegisterPage() {
     }
   }, [previewUrl])
 
+  // Helper function to capitalize first letter of each word
+  const capitalizeName = (name: string): string => {
+    if (!name) return name
+    
+    // Split by spaces and capitalize each part
+    return name
+      .toLowerCase()
+      .split(' ')
+      .map(word => {
+        if (word.length === 0) return word
+        // Handle special cases like "Dela Cruz" -> "Dela Cruz" (keep Dela as is)
+        // But ensure first letter is capitalized
+        return word.charAt(0).toUpperCase() + word.slice(1)
+      })
+      .join(' ')
+  }
+
+  // Handle name changes with automatic capitalization
+  const handleNameChange = (field: 'firstName' | 'middleName' | 'lastName', value: string) => {
+    // Allow spaces but apply capitalization
+    const capitalizedValue = capitalizeName(value)
+    setFormData(prev => ({ ...prev, [field]: capitalizedValue }))
+  }
+
   const grades = ['11', '12']
   const sexes = ['Male', 'Female']
 
@@ -428,6 +452,14 @@ export default function RegisterPage() {
       setQrGenerating(true)
       const qrCodeData = await generateEncryptedQRCode(formData.lrn)
 
+      // Ensure names are properly capitalized before submitting
+      const capitalizedFirstName = capitalizeName(formData.firstName)
+      const capitalizedMiddleName = capitalizeName(formData.middleName)
+      const capitalizedLastName = capitalizeName(formData.lastName)
+      const capitalizedFatherName = capitalizeName(formData.fatherName)
+      const capitalizedMotherName = capitalizeName(formData.motherName)
+      const capitalizedGuardianName = capitalizeName(formData.guardianName)
+
       // Insert with hashed password and base64 photo
       const { data, error: dbError } = await supabase
         .from('students')
@@ -439,9 +471,9 @@ export default function RegisterPage() {
             password_hash: hashedPassword,
             
             // Personal Information
-            first_name: formData.firstName,
-            middle_name: formData.middleName,
-            last_name: formData.lastName,
+            first_name: capitalizedFirstName,
+            middle_name: capitalizedMiddleName,
+            last_name: capitalizedLastName,
             sex: formData.sex,
             date_of_birth: formData.dateOfBirth,
             contact_number: formData.contactNumber,
@@ -455,11 +487,11 @@ export default function RegisterPage() {
             previous_high_school: formData.previousHighSchool || null,
             
             // Parents Information
-            father_name: formData.fatherName || null,
+            father_name: capitalizedFatherName || null,
             father_occupation: formData.fatherOccupation || null,
-            mother_name: formData.motherName || null,
+            mother_name: capitalizedMotherName || null,
             mother_occupation: formData.motherOccupation || null,
-            guardian_name: formData.guardianName || null,
+            guardian_name: capitalizedGuardianName || null,
             guardian_contact: formData.guardianContact || null,
             
             // Medical Background
@@ -613,39 +645,42 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            {/* Rest of the form remains the same */}
+            {/* Name fields with capitalization */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">First Name *</label>
                 <input
                   type="text"
                   value={formData.firstName}
-                  onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
+                  onChange={(e) => handleNameChange('firstName', e.target.value)}
                   required
                   className="w-full px-4 py-3 text-base bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                   placeholder="Juan"
                 />
+                <p className="text-xs text-gray-400 mt-1">Automatically capitalizes first letter</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Middle Name</label>
                 <input
                   type="text"
                   value={formData.middleName}
-                  onChange={(e) => setFormData(prev => ({ ...prev, middleName: e.target.value }))}
+                  onChange={(e) => handleNameChange('middleName', e.target.value)}
                   className="w-full px-4 py-3 text-base bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                   placeholder="Santos"
                 />
+                <p className="text-xs text-gray-400 mt-1">Automatically capitalizes first letter</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Last Name *</label>
                 <input
                   type="text"
                   value={formData.lastName}
-                  onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
+                  onChange={(e) => handleNameChange('lastName', e.target.value)}
                   required
                   className="w-full px-4 py-3 text-base bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                   placeholder="Dela Cruz"
                 />
+                <p className="text-xs text-gray-400 mt-1">Automatically capitalizes first letter</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Sex *</label>
@@ -705,7 +740,6 @@ export default function RegisterPage() {
           </div>
         )
 
-      // Steps 2-5 remain the same
       case 2:
         return (
           <div className="space-y-5">
@@ -776,7 +810,10 @@ export default function RegisterPage() {
                   <input
                     type="text"
                     value={formData.fatherName}
-                    onChange={(e) => setFormData(prev => ({ ...prev, fatherName: e.target.value }))}
+                    onChange={(e) => {
+                      const capitalized = capitalizeName(e.target.value)
+                      setFormData(prev => ({ ...prev, fatherName: capitalized }))
+                    }}
                     className="w-full pl-12 pr-4 py-3 text-base bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                     placeholder="Juan Dela Cruz Sr."
                   />
@@ -806,7 +843,10 @@ export default function RegisterPage() {
                   <input
                     type="text"
                     value={formData.motherName}
-                    onChange={(e) => setFormData(prev => ({ ...prev, motherName: e.target.value }))}
+                    onChange={(e) => {
+                      const capitalized = capitalizeName(e.target.value)
+                      setFormData(prev => ({ ...prev, motherName: capitalized }))
+                    }}
                     className="w-full pl-12 pr-4 py-3 text-base bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                     placeholder="Maria Dela Cruz"
                   />
@@ -832,7 +872,10 @@ export default function RegisterPage() {
                 <input
                   type="text"
                   value={formData.guardianName}
-                  onChange={(e) => setFormData(prev => ({ ...prev, guardianName: e.target.value }))}
+                  onChange={(e) => {
+                    const capitalized = capitalizeName(e.target.value)
+                    setFormData(prev => ({ ...prev, guardianName: capitalized }))
+                  }}
                   className="w-full px-4 py-3 text-base bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                   placeholder="Guardian's Full Name"
                 />
