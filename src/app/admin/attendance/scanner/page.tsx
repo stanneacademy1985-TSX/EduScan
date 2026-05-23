@@ -107,7 +107,6 @@ export default function QRScannerPage() {
   const scanCooldownRef = useRef<{ [key: string]: number }>({})
   const lastFrameTimeRef = useRef<number>(0)
   const frameSkipRef = useRef<number>(0)
-  const seatPlanRef = useRef<HTMLDivElement>(null)
   
   const [scannerActive, setScannerActive] = useState(false)
   const [cameraPermission, setCameraPermission] = useState<boolean | null>(null)
@@ -1260,7 +1259,7 @@ export default function QRScannerPage() {
         </div>
       ) : (
         // Seat Plan View with Attendance Toolbar
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden" ref={seatPlanRef}>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           {/* Attendance Toolbar */}
           <div className="border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white p-4 sm:p-5">
             <div>
@@ -1377,7 +1376,7 @@ export default function QRScannerPage() {
             )}
           </div>
 
-          {/* Seat Plan Grid - Truly Responsive Cards */}
+          {/* Seat Plan Grid - Perfectly Sized Responsive Cards */}
           <div className="p-4">
             {sectionStudents.length === 0 ? (
               <div className="text-center py-12">
@@ -1386,8 +1385,8 @@ export default function QRScannerPage() {
               </div>
             ) : (
               <>
-                {/* Responsive grid that works on all devices */}
-                <div className="grid grid-cols-1 gap-4">
+                {/* Responsive grid that actually works on mobile */}
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                   {seatArrangement.map((student, index) => {
                     const status = studentAttendanceStatus[student.id]
                     const isMarked = !!status
@@ -1398,63 +1397,59 @@ export default function QRScannerPage() {
                       <div
                         key={student.id}
                         onClick={() => handleStudentCardClick(student.id)}
-                        className={`relative rounded-xl border-2 transition-all duration-200 cursor-pointer touch-manipulation ${
+                        className={`relative rounded-lg border-2 transition-all duration-200 cursor-pointer ${
                           isMarked
                             ? status === 'present'
-                              ? 'bg-gradient-to-br from-green-50 to-green-100 border-green-400 shadow-md'
+                              ? 'bg-green-50 border-green-400'
                               : status === 'late'
-                              ? 'bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-400 shadow-md'
-                              : 'bg-gradient-to-br from-red-50 to-red-100 border-red-400 shadow-md'
+                              ? 'bg-yellow-50 border-yellow-400'
+                              : 'bg-red-50 border-red-400'
                             : isSelected
-                            ? 'border-blue-400 bg-blue-50 shadow-md ring-2 ring-blue-300'
-                            : 'border-gray-200 bg-white hover:border-blue-300 hover:shadow-lg'
-                        } ${isMarkingMode && attendanceMode && !isMarked ? 'active:scale-98 transition-transform' : ''}`}
+                            ? 'border-blue-400 bg-blue-50 ring-2 ring-blue-300'
+                            : 'border-gray-200 bg-white hover:border-blue-300 hover:shadow-md'
+                        } ${isMarkingMode && attendanceMode && !isMarked ? 'active:scale-95 transition-transform' : ''}`}
                       >
                         {/* Seat Number Badge */}
-                        <div className="absolute -top-3 -left-3 w-10 h-10 rounded-full bg-gradient-to-br from-gray-700 to-gray-800 text-white text-base font-bold flex items-center justify-center shadow-lg z-10">
+                        <div className="absolute -top-2 -left-2 w-6 h-6 rounded-full bg-gray-800 text-white text-[10px] font-bold flex items-center justify-center shadow-md z-10">
                           {index + 1}
                         </div>
                         
-                        <div className="p-5 pt-7">
+                        <div className="p-2 pt-3">
                           <div className="text-center">
-                            <p className="font-bold text-gray-800 text-xl md:text-2xl leading-tight break-words">
+                            <p className="font-semibold text-gray-800 text-xs sm:text-sm leading-tight break-words">
                               {displayName}
                             </p>
-                            {student.sex && (
-                              <p className="text-sm text-gray-500 mt-1">
-                                {student.sex}
-                              </p>
-                            )}
                           </div>
                           
                           {/* Status Indicator */}
                           {isMarked && (
-                            <div className="mt-4 pt-3 border-t border-current border-opacity-20">
-                              <div className={`text-center py-2 px-3 rounded-lg ${
+                            <div className="mt-1.5 pt-1.5 border-t border-current border-opacity-20">
+                              <div className={`text-center py-0.5 px-1 rounded ${
                                 status === 'present' ? 'bg-green-200 text-green-800' :
                                 status === 'late' ? 'bg-yellow-200 text-yellow-800' :
                                 'bg-red-200 text-red-800'
                               }`}>
-                                <span className="text-sm font-bold uppercase tracking-wide">
-                                  {status}
+                                <span className="text-[10px] font-bold uppercase">
+                                  {status === 'present' ? 'P' : status === 'late' ? 'L' : 'A'}
                                 </span>
                               </div>
                             </div>
                           )}
                           
-                          {/* Empty state placeholder for unmarked */}
+                          {/* Marking mode indicator for unmarked cards */}
                           {!isMarked && isMarkingMode && attendanceMode && (
-                            <div className="mt-4 pt-3 text-center">
-                              <div className="text-sm text-gray-400 italic">Tap to mark</div>
+                            <div className="mt-1.5 pt-1.5 text-center">
+                              <div className="text-[10px] text-gray-400 italic">
+                                Tap
+                              </div>
                             </div>
                           )}
                           
-                          {/* Hover/Tap instruction for marking mode */}
+                          {/* Hover/Tap overlay for marking mode */}
                           {isMarkingMode && attendanceMode && !isMarked && (
-                            <div className="absolute inset-0 bg-black/70 rounded-xl flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Fingerprint className="w-10 h-10 text-white mb-2" />
-                              <p className="text-white text-base font-medium">Tap to mark</p>
-                              <p className="text-white text-sm capitalize mt-1">{attendanceMode}</p>
+                            <div className="absolute inset-0 bg-black/70 rounded-lg flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Fingerprint className="w-5 h-5 text-white mb-1" />
+                              <p className="text-white text-[10px] font-medium">Mark</p>
                             </div>
                           )}
                         </div>
@@ -1471,23 +1466,23 @@ export default function QRScannerPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                   <div className="bg-blue-50 rounded-lg p-2 text-center">
                     <p className="text-xs text-gray-600">Total</p>
-                    <p className="text-xl font-bold text-blue-600">{sectionStudents.length}</p>
+                    <p className="text-lg font-bold text-blue-600">{sectionStudents.length}</p>
                   </div>
                   <div className="bg-green-50 rounded-lg p-2 text-center">
                     <p className="text-xs text-gray-600">Present</p>
-                    <p className="text-xl font-bold text-green-600">{stats.presentCount}</p>
+                    <p className="text-lg font-bold text-green-600">{stats.presentCount}</p>
                   </div>
                   <div className="bg-yellow-50 rounded-lg p-2 text-center">
                     <p className="text-xs text-gray-600">Late</p>
-                    <p className="text-xl font-bold text-yellow-600">{stats.lateCount}</p>
+                    <p className="text-lg font-bold text-yellow-600">{stats.lateCount}</p>
                   </div>
                   <div className="bg-red-50 rounded-lg p-2 text-center">
                     <p className="text-xs text-gray-600">Absent</p>
-                    <p className="text-xl font-bold text-red-600">{stats.absentCount}</p>
+                    <p className="text-lg font-bold text-red-600">{stats.absentCount}</p>
                   </div>
                   <div className="bg-purple-50 rounded-lg p-2 text-center col-span-2 sm:col-span-1">
                     <p className="text-xs text-gray-600">Complete</p>
-                    <p className="text-xl font-bold text-purple-600">
+                    <p className="text-lg font-bold text-purple-600">
                       {Math.round(((stats.presentCount + stats.lateCount + stats.absentCount) / sectionStudents.length) * 100)}%
                     </p>
                   </div>
@@ -1519,11 +1514,8 @@ export default function QRScannerPage() {
         .animate-scan {
           animation: scan 2s linear infinite;
         }
-        .active\\:scale-98:active {
-          transform: scale(0.98);
-        }
-        .touch-manipulation {
-          touch-action: manipulation;
+        .active\\:scale-95:active {
+          transform: scale(0.95);
         }
       `}</style>
     </div>
