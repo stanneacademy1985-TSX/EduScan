@@ -1376,7 +1376,7 @@ export default function QRScannerPage() {
             )}
           </div>
 
-          {/* Seat Plan Grid - Perfectly Sized Responsive Cards */}
+          {/* Seat Plan Grid - Slightly Larger Responsive Cards */}
           <div className="p-4">
             {sectionStudents.length === 0 ? (
               <div className="text-center py-12">
@@ -1385,8 +1385,8 @@ export default function QRScannerPage() {
               </div>
             ) : (
               <>
-                {/* Responsive grid that actually works on mobile */}
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+                {/* Responsive grid - 2 columns on mobile, more on larger screens */}
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                   {seatArrangement.map((student, index) => {
                     const status = studentAttendanceStatus[student.id]
                     const isMarked = !!status
@@ -1397,7 +1397,7 @@ export default function QRScannerPage() {
                       <div
                         key={student.id}
                         onClick={() => handleStudentCardClick(student.id)}
-                        className={`relative rounded-lg border-2 transition-all duration-200 cursor-pointer ${
+                        className={`relative rounded-xl border-2 transition-all duration-200 cursor-pointer ${
                           isMarked
                             ? status === 'present'
                               ? 'bg-green-50 border-green-400'
@@ -1410,27 +1410,27 @@ export default function QRScannerPage() {
                         } ${isMarkingMode && attendanceMode && !isMarked ? 'active:scale-95 transition-transform' : ''}`}
                       >
                         {/* Seat Number Badge */}
-                        <div className="absolute -top-2 -left-2 w-6 h-6 rounded-full bg-gray-800 text-white text-[10px] font-bold flex items-center justify-center shadow-md z-10">
+                        <div className="absolute -top-2 -left-2 w-7 h-7 rounded-full bg-gray-800 text-white text-xs font-bold flex items-center justify-center shadow-md z-10">
                           {index + 1}
                         </div>
                         
-                        <div className="p-2 pt-3">
+                        <div className="p-3 pt-4">
                           <div className="text-center">
-                            <p className="font-semibold text-gray-800 text-xs sm:text-sm leading-tight break-words">
+                            <p className="font-semibold text-gray-800 text-sm sm:text-base leading-tight break-words">
                               {displayName}
                             </p>
                           </div>
                           
                           {/* Status Indicator */}
                           {isMarked && (
-                            <div className="mt-1.5 pt-1.5 border-t border-current border-opacity-20">
-                              <div className={`text-center py-0.5 px-1 rounded ${
+                            <div className="mt-2 pt-2 border-t border-current border-opacity-20">
+                              <div className={`text-center py-1 px-2 rounded-lg ${
                                 status === 'present' ? 'bg-green-200 text-green-800' :
                                 status === 'late' ? 'bg-yellow-200 text-yellow-800' :
                                 'bg-red-200 text-red-800'
                               }`}>
-                                <span className="text-[10px] font-bold uppercase">
-                                  {status === 'present' ? 'P' : status === 'late' ? 'L' : 'A'}
+                                <span className="text-xs font-bold uppercase">
+                                  {status}
                                 </span>
                               </div>
                             </div>
@@ -1438,18 +1438,19 @@ export default function QRScannerPage() {
                           
                           {/* Marking mode indicator for unmarked cards */}
                           {!isMarked && isMarkingMode && attendanceMode && (
-                            <div className="mt-1.5 pt-1.5 text-center">
-                              <div className="text-[10px] text-gray-400 italic">
-                                Tap
+                            <div className="mt-2 pt-2 text-center">
+                              <div className="text-xs text-gray-400 italic">
+                                Tap to mark
                               </div>
                             </div>
                           )}
                           
                           {/* Hover/Tap overlay for marking mode */}
                           {isMarkingMode && attendanceMode && !isMarked && (
-                            <div className="absolute inset-0 bg-black/70 rounded-lg flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Fingerprint className="w-5 h-5 text-white mb-1" />
-                              <p className="text-white text-[10px] font-medium">Mark</p>
+                            <div className="absolute inset-0 bg-black/70 rounded-xl flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Fingerprint className="w-6 h-6 text-white mb-1" />
+                              <p className="text-white text-xs font-medium">Tap to mark</p>
+                              <p className="text-white text-xs capitalize mt-0.5">{attendanceMode}</p>
                             </div>
                           )}
                         </div>
