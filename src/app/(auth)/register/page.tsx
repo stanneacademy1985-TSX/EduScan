@@ -657,7 +657,7 @@ export default function RegisterPage() {
                   className="w-full px-4 py-3 text-base bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                   placeholder="Juan"
                 />
-                <p className="text-xs text-gray-400 mt-1">Automatically capitalizes first letter</p>
+                <p className="text-xs text-gray-400 mt-1">Your First Name</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Middle Name</label>
@@ -668,7 +668,7 @@ export default function RegisterPage() {
                   className="w-full px-4 py-3 text-base bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                   placeholder="Santos"
                 />
-                <p className="text-xs text-gray-400 mt-1">Automatically capitalizes first letter</p>
+                <p className="text-xs text-gray-400 mt-1">Your Middle Name</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Last Name *</label>
@@ -680,7 +680,7 @@ export default function RegisterPage() {
                   className="w-full px-4 py-3 text-base bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                   placeholder="Dela Cruz"
                 />
-                <p className="text-xs text-gray-400 mt-1">Automatically capitalizes first letter</p>
+                <p className="text-xs text-gray-400 mt-1">Your Last Name</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Sex *</label>
