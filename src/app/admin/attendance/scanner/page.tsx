@@ -26,7 +26,10 @@ import {
   Lock,
   UserPlus,
   CheckSquare,
-  MessageSquare
+  MessageSquare,
+  MoreVertical,
+  Grid,
+  LayoutGrid
 } from 'lucide-react'
 import jsQR from 'jsqr'
 import { decryptFromQR, extractLRNFromDecrypted } from '../../../../../lib/encryption'
@@ -37,6 +40,8 @@ interface Student {
   full_name: string
   first_name: string
   last_name: string
+  middle_name?: string
+  sex?: string
   grade: string
   section: string
   profile_photo_base64: string | null
@@ -61,16 +66,28 @@ interface AttendanceSession {
   }
 }
 
-const buildGradeVariants = (grade: string): string[] => {
-  const raw = (grade || '').trim()
-  if (!raw) return []
-
-  const digits = raw.replace(/[^0-9]/g, '')
-  if (digits === '11' || digits === '12') {
-    return Array.from(new Set([raw, digits, `Grade ${digits}`]))
+// Helper function to format name as "Last, First M."
+const formatStudentName = (student: Student): string => {
+  const lastName = student.last_name || ''
+  const firstName = student.first_name || ''
+  const middleInitial = student.middle_name && student.middle_name.trim() 
+    ? student.middle_name.charAt(0).toUpperCase() + '.' 
+    : ''
+  
+  if (!lastName && !firstName) return student.full_name || 'Unknown'
+  
+  if (middleInitial) {
+    return `${lastName}, ${firstName} ${middleInitial}`
   }
+  return `${lastName}, ${firstName}`
+}
 
-  return [raw]
+// Helper function to capitalize first letter
+const capitalizeName = (name: string): string => {
+  if (!name) return ''
+  return name.toLowerCase().split(' ').map(word => 
+    word.charAt(0).toUpperCase() + word.slice(1)
+  ).join(' ')
 }
 
 export default function QRScannerPage() {
@@ -124,16 +141,11 @@ export default function QRScannerPage() {
   const [manualStatus, setManualStatus] = useState<'present' | 'absent' | 'late' | 'excused'>('present')
   const [useManualStatus, setUseManualStatus] = useState(false)
   const [markAllLoading, setMarkAllLoading] = useState(false)
-  const [sectionStudents, setSectionStudents] = useState<Array<{
-    id: string
-    lrn: string
-    full_name: string
-    grade: string
-    section: string
-    profile_photo_base64: string | null
-  }>>([])
+  const [sectionStudents, setSectionStudents] = useState<Student[]>([])
   const [studentAttendanceStatus, setStudentAttendanceStatus] = useState<{ [key: string]: string }>({})
   const [studentRemarks, setStudentRemarks] = useState<{ [key: string]: string }>({})
+  const [seatArrangement, setSeatArrangement] = useState<Student[]>([])
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
 
   const [beepSound] = useState(() => {
     if (typeof Audio !== 'undefined') {
@@ -207,6 +219,40 @@ export default function QRScannerPage() {
       startScanning()
     }
   }, [scannerActive, scanning])
+
+  // Generate seat arrangement when students are loaded
+  useEffect(() => {
+    if (sectionStudents.length > 0) {
+      generateSeatArrangement(sectionStudents)
+    }
+  }, [sectionStudents, studentAttendanceStatus])
+
+  const generateSeatArrangement = (students: Student[]) => {
+    // Sort students by last name
+    const sorted = [...students].sort((a, b) => {
+      const lastNameA = a.last_name || a.full_name.split(' ').pop() || ''
+      const lastNameB = b.last_name || b.full_name.split(' ').pop() || ''
+      return lastNameA.localeCompare(lastNameB)
+    })
+
+    // Alternate by gender (Male -> Female -> Male -> Female...)
+    const males = sorted.filter(s => s.sex === 'Male')
+    const females = sorted.filter(s => s.sex === 'Female')
+    const others = sorted.filter(s => s.sex !== 'Male' && s.sex !== 'Female')
+    
+    const arranged: Student[] = []
+    const maxLength = Math.max(males.length, females.length)
+    
+    for (let i = 0; i < maxLength; i++) {
+      if (males[i]) arranged.push(males[i])
+      if (females[i]) arranged.push(females[i])
+    }
+    
+    // Add others at the end
+    arranged.push(...others)
+    
+    setSeatArrangement(arranged)
+  }
 
   const fetchActiveSessions = async (adminOverride?: AdminSessionUser | null) => {
     try {
@@ -315,9 +361,9 @@ export default function QRScannerPage() {
 
       let query = supabase
         .from('students')
-        .select('id, lrn, full_name, grade, section, profile_photo_base64')
+        .select('id, lrn, full_name, first_name, last_name, middle_name, sex, grade, section, profile_photo_base64')
         .in('grade', gradeVariants)
-        .order('full_name', { ascending: true })
+        .order('last_name', { ascending: true })
 
       if (assignedStudentIds !== null) {
         query = query.in('id', assignedStudentIds)
@@ -327,7 +373,14 @@ export default function QRScannerPage() {
 
       if (studentError) throw studentError
 
-      setSectionStudents(students || [])
+      const formattedStudents = (students || []).map(student => ({
+        ...student,
+        first_name: capitalizeName(student.first_name || ''),
+        last_name: capitalizeName(student.last_name || ''),
+        middle_name: student.middle_name ? capitalizeName(student.middle_name) : ''
+      }))
+
+      setSectionStudents(formattedStudents || [])
 
       const { data: alreadyMarked, error: markedError } = await supabase
         .from('attendance')
@@ -348,6 +401,18 @@ export default function QRScannerPage() {
     } catch (error) {
       console.error('Error fetching section students:', error)
     }
+  }
+
+  const buildGradeVariants = (grade: string): string[] => {
+    const raw = (grade || '').trim()
+    if (!raw) return []
+
+    const digits = raw.replace(/[^0-9]/g, '')
+    if (digits === '11' || digits === '12') {
+      return Array.from(new Set([raw, digits, `Grade ${digits}`]))
+    }
+
+    return [raw]
   }
 
   const checkCameraPermission = async () => {
@@ -471,7 +536,6 @@ export default function QRScannerPage() {
     const now = performance.now()
     const elapsed = now - lastFrameTimeRef.current
     
-    // Limit frame rate to 15 FPS for better performance
     if (elapsed < 66) {
       animationRef.current = requestAnimationFrame(scanQRCode)
       return
@@ -546,265 +610,6 @@ export default function QRScannerPage() {
     }
   }
 
-  const handleManualAttendance = async () => {
-    const lrnValidation = validateLrn(manualLRN)
-
-    if (!lrnValidation.isValid) {
-      setScanResult({
-        success: false,
-        message: lrnValidation.errorMessage || 'Invalid LRN'
-      })
-      playSound('error')
-      return
-    }
-
-    const cleanedManualLRN = lrnValidation.lrn
-
-    if (!selectedSession) {
-      setScanResult({
-        success: false,
-        message: 'Please select an active session first'
-      })
-      return
-    }
-
-    setTempRegistrationLoading(true)
-
-    try {
-      const session = selectedSessionDetails
-      if (!session) throw new Error('Session not found')
-
-      const { data: existingStudent } = await supabase
-        .from('students')
-        .select('id, full_name')
-        .eq('lrn', cleanedManualLRN)
-        .maybeSingle()
-
-      const nowTime = new Date()
-      const hours = nowTime.getHours().toString().padStart(2, '0')
-      const minutes = nowTime.getMinutes().toString().padStart(2, '0')
-      const seconds = nowTime.getSeconds().toString().padStart(2, '0')
-      const currentTime = `${hours}:${minutes}:${seconds}`
-      const today = new Date().toISOString().split('T')[0]
-
-      const { data: existingTemp } = await supabase
-        .from('attendance')
-        .select('id')
-        .eq('lrn', cleanedManualLRN)
-        .eq('date', today)
-        .eq('is_temporary', true)
-        .maybeSingle()
-
-      if (existingTemp) {
-        setScanResult({
-          success: false,
-          message: `Temporary attendance already recorded for LRN: ${cleanedManualLRN} today`
-        })
-        playSound('error')
-        setShowManualEntry(false)
-        return
-      }
-
-      let status = manualStatus
-      if (!useManualStatus) {
-        status = determineAttendanceStatus(currentTime, session) as 'present' | 'absent' | 'late'
-      }
-
-      const { error: attendanceError } = await supabase
-        .from('attendance')
-        .insert([{
-          student_id: existingStudent?.id || null,
-          lrn: cleanedManualLRN,
-          student_name: manualName || existingStudent?.full_name || 'Unregistered Student',
-          grade: session.grade,
-          section: session.section,
-          date: today,
-          time_in: currentTime,
-          status,
-          session_id: selectedSession,
-          teacher_id: admin?.id,
-          teacher_name: admin?.full_name || 'Unknown',
-          recorded_by: admin?.id,
-          is_temporary: !existingStudent,
-          needs_registration: !existingStudent,
-          notes: manualRemarks || null
-        }])
-
-      if (attendanceError) throw attendanceError
-
-      const statusMessage = status === 'present' ? 'PRESENT' : status === 'late' ? 'LATE' : status === 'excused' ? 'EXCUSED' : 'ABSENT'
-
-      setScanResult({
-        success: true,
-        message: existingStudent
-          ? `${existingStudent.full_name} - ${statusMessage}${manualRemarks ? ` (${manualRemarks})` : ''}`
-          : `[TEMPORARY] ${manualName || 'Student'} (LRN: ${cleanedManualLRN}) - ${statusMessage}${manualRemarks ? ` (${manualRemarks})` : ''}`,
-        isTemporary: !existingStudent,
-        needsRegistration: !existingStudent
-      })
-      playSound('success')
-
-      await fetchSessionStats()
-      setShowManualEntry(false)
-      setManualLRN('')
-      setManualName('')
-      setManualRemarks('')
-      setManualStatus('present')
-      setUseManualStatus(false)
-
-      setTimeout(() => {
-        setScanResult(null)
-      }, 3000)
-    } catch (error) {
-      console.error('Error recording manual attendance:', error)
-      setScanResult({
-        success: false,
-        message: 'Error recording attendance'
-      })
-      playSound('error')
-    } finally {
-      setTempRegistrationLoading(false)
-    }
-  }
-
-  const markAllStudentsPresent = async () => {
-    if (!selectedSession || !selectedSessionDetails) {
-      setScanResult({
-        success: false,
-        message: 'Please select an active session first'
-      })
-      return
-    }
-
-    if (!window.confirm('Mark all currently listed students as PRESENT? This will override late/absent/excused marks for today.')) {
-      return
-    }
-
-    setMarkAllLoading(true)
-
-    try {
-      const today = new Date().toISOString().split('T')[0]
-
-      let listedStudents = sectionStudents
-
-      if (listedStudents.length === 0) {
-        const gradeVariants = buildGradeVariants(selectedSessionDetails.grade)
-
-        let query = supabase
-          .from('students')
-          .select('id, lrn, full_name, grade, section, profile_photo_base64')
-          .in('grade', gradeVariants)
-          .order('full_name', { ascending: true })
-
-        const { data, error: studentError } = await query
-        if (studentError) throw studentError
-        listedStudents = data || []
-        setSectionStudents(listedStudents)
-      }
-
-      if (listedStudents.length === 0) {
-        setScanResult({
-          success: false,
-          message: 'No listed students found to mark as PRESENT'
-        })
-        playSound('error')
-        return
-      }
-
-      const listedStudentIds = listedStudents.map((s) => s.id)
-
-      const { data: alreadyMarked, error: markedError } = await supabase
-        .from('attendance')
-        .select('id, student_id, status')
-        .eq('session_id', selectedSession)
-        .eq('date', today)
-        .in('student_id', listedStudentIds)
-
-      if (markedError) throw markedError
-
-      const existingByStudentId = new Map<string, { id: string; status: string }>()
-      for (const record of alreadyMarked || []) {
-        if (record.student_id && record.id) {
-          existingByStudentId.set(record.student_id, {
-            id: record.id,
-            status: record.status
-          })
-        }
-      }
-
-      const nowTime = new Date()
-      const hours = nowTime.getHours().toString().padStart(2, '0')
-      const minutes = nowTime.getMinutes().toString().padStart(2, '0')
-      const seconds = nowTime.getSeconds().toString().padStart(2, '0')
-      const currentTime = `${hours}:${minutes}:${seconds}`
-
-      const studentsToInsert = listedStudents.filter((student) => !existingByStudentId.has(student.id))
-      const attendanceIdsToUpdate = Array.from(existingByStudentId.values())
-        .filter((record) => record.status !== 'present')
-        .map((record) => record.id)
-
-      const recordsToInsert = studentsToInsert.map((student) => ({
-        student_id: student.id,
-        lrn: student.lrn,
-        full_name: student.full_name,
-        grade: student.grade,
-        section: student.section,
-        date: today,
-        time_in: currentTime,
-        status: 'present',
-        session_id: selectedSession,
-        teacher_id: admin?.id,
-        teacher_name: admin?.full_name || 'Unknown',
-        recorded_by: admin?.id,
-        notes: 'Marked present via bulk operation'
-      }))
-
-      if (attendanceIdsToUpdate.length > 0) {
-        const { error: updateError } = await supabase
-          .from('attendance')
-          .update({ status: 'present', notes: 'Marked present via bulk operation' })
-          .in('id', attendanceIdsToUpdate)
-
-        if (updateError) throw updateError
-      }
-
-      if (recordsToInsert.length > 0) {
-        const { error: insertError } = await supabase
-          .from('attendance')
-          .insert(recordsToInsert)
-
-        if (insertError) throw insertError
-      }
-
-      const updatedStatusMap = { ...studentAttendanceStatus }
-      for (const student of listedStudents) {
-        updatedStatusMap[student.id] = 'present'
-      }
-      setStudentAttendanceStatus(updatedStatusMap)
-
-      setScanResult({
-        success: true,
-        message: `Successfully marked ${listedStudents.length} listed student(s) as PRESENT`
-      })
-      playSound('success')
-
-      await fetchSessionStats()
-
-      setTimeout(() => {
-        setScanResult(null)
-      }, 4000)
-    } catch (error) {
-      console.error('Error marking all students present:', error)
-      setScanResult({
-        success: false,
-        message: 'Error marking all students present'
-      })
-      playSound('error')
-    } finally {
-      setMarkAllLoading(false)
-    }
-  }
-
   const recordStudentAttendance = async (studentId: string, status: string) => {
     if (!selectedSession || !selectedSessionDetails) {
       setScanResult({
@@ -826,33 +631,37 @@ export default function QRScannerPage() {
       const currentTime = `${hours}:${minutes}:${seconds}`
 
       if (studentAttendanceStatus[studentId]) {
-        setScanResult({
-          success: false,
-          message: `${student.full_name} is already marked as ${studentAttendanceStatus[studentId]}`
-        })
-        playSound('error')
-        return
+        // Update existing attendance
+        const { error: updateError } = await supabase
+          .from('attendance')
+          .update({ status: status })
+          .eq('student_id', studentId)
+          .eq('session_id', selectedSession)
+          .eq('date', today)
+
+        if (updateError) throw updateError
+      } else {
+        // Insert new attendance
+        const { error: attendanceError } = await supabase
+          .from('attendance')
+          .insert([{
+            student_id: studentId,
+            lrn: student.lrn,
+            full_name: formatStudentName(student),
+            grade: student.grade,
+            section: student.section,
+            date: today,
+            time_in: currentTime,
+            status: status,
+            session_id: selectedSession,
+            teacher_id: admin?.id,
+            teacher_name: admin?.full_name || 'Unknown',
+            recorded_by: admin?.id,
+            notes: studentRemarks[studentId] || null
+          }])
+
+        if (attendanceError) throw attendanceError
       }
-
-      const { error: attendanceError } = await supabase
-        .from('attendance')
-        .insert([{
-          student_id: studentId,
-          lrn: student.lrn,
-          full_name: student.full_name,
-          grade: student.grade,
-          section: student.section,
-          date: today,
-          time_in: currentTime,
-          status: status,
-          session_id: selectedSession,
-          teacher_id: admin?.id,
-          teacher_name: admin?.full_name || 'Unknown',
-          recorded_by: admin?.id,
-          notes: studentRemarks[studentId] || null
-        }])
-
-      if (attendanceError) throw attendanceError
 
       setStudentAttendanceStatus(prev => ({
         ...prev,
@@ -861,11 +670,12 @@ export default function QRScannerPage() {
 
       setScanResult({
         success: true,
-        message: `${student.full_name} - ${status.toUpperCase()}${studentRemarks[studentId] ? ` (${studentRemarks[studentId]})` : ''}`
+        message: `${formatStudentName(student)} - ${status.toUpperCase()}`
       })
       playSound('success')
 
       await fetchSessionStats()
+      setOpenMenuId(null)
 
       setTimeout(() => {
         setScanResult(null)
@@ -877,58 +687,6 @@ export default function QRScannerPage() {
         message: 'Error recording attendance'
       })
       playSound('error')
-    }
-  }
-
-  const normalizePhilippineMobile = (phone: string) => {
-    const digits = phone.replace(/[^0-9]/g, '')
-    if (digits.length === 11 && digits.startsWith('09')) {
-      return '+63' + digits.slice(1)
-    }
-    if (digits.length === 10 && digits.startsWith('9')) {
-      return '+63' + digits
-    }
-    if (digits.length === 12 && digits.startsWith('63')) {
-      return '+' + digits
-    }
-    if (digits.length === 13 && digits.startsWith('0')) {
-      return '+' + digits.slice(1)
-    }
-    return phone
-  }
-
-  const sendAttendanceFamilyNotification = async (student: Student, status: string, timeIn: string) => {
-    const rawMobile = student.guardian_contact || student.contact_number || ''
-    const mobile = rawMobile ? normalizePhilippineMobile(rawMobile) : ''
-    const email = student.email || ''
-    if (!mobile && !email) {
-      return
-    }
-
-    const messageBody = `Hi, this is EduScan. Your child ${student.full_name} is now marked as ${status} in school at ${timeIn}.` +
-      ` Thank you.`
-
-    try {
-      const response = await fetch('/api/alerts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          studentId: student.id,
-          studentName: student.full_name,
-          mobile,
-          email,
-          message: messageBody,
-        }),
-      })
-
-      const data = await response.json()
-      if (!response.ok) {
-        console.warn('Family alert send failed for attendance:', data)
-      } else {
-        console.info('Family alert send result:', data)
-      }
-    } catch (err) {
-      console.error('sendAttendanceFamilyNotification error:', err)
     }
   }
 
@@ -960,7 +718,6 @@ export default function QRScannerPage() {
           }
           
           lrn = extractedLrn
-          console.log('Decrypted encrypted QR code')
         } catch (error) {
           console.error('Decryption failed:', error)
           setScanResult({
@@ -1000,12 +757,7 @@ export default function QRScannerPage() {
 
       const { data: session, error: sessionError } = await supabase
         .from('attendance_sessions')
-        .select(`
-          *,
-          admin_users!attendance_sessions_teacher_id_fkey (
-            full_name
-          )
-        `)
+        .select('*')
         .eq('id', selectedSession)
         .single()
 
@@ -1119,7 +871,7 @@ export default function QRScannerPage() {
         .insert([{
           student_id: student.id,
           lrn: student.lrn,
-          full_name: student.full_name,
+          full_name: formatStudentName(student),
           grade: student.grade,
           section: student.section,
           date: today,
@@ -1127,7 +879,7 @@ export default function QRScannerPage() {
           status: status,
           session_id: selectedSession,
           teacher_id: session.teacher_id,
-          teacher_name: session.admin_users?.full_name || 'Unknown',
+          teacher_name: admin?.full_name || 'Unknown',
           recorded_by: admin?.id
         }])
 
@@ -1139,13 +891,11 @@ export default function QRScannerPage() {
       
       setScanResult({
         success: true,
-        message: `${student.full_name} - ${statusMessage}`,
+        message: `${formatStudentName(student)} - ${statusMessage}`,
         student,
         isEncrypted
       })
       playSound('success')
-
-      sendAttendanceFamilyNotification(student, statusMessage.toLowerCase(), currentTime)
       
       await fetchSessionStats()
 
@@ -1171,19 +921,32 @@ export default function QRScannerPage() {
     try {
       if (time.length === 8 && time.includes(':')) {
         const [hours, minutes] = time.split(':')
-        return new Date(`2000-01-01T${hours}:${minutes}:00`).toLocaleTimeString('en-US', {
-          hour: 'numeric',
-          minute: '2-digit',
-          hour12: true
-        })
+        const hour = parseInt(hours)
+        const ampm = hour >= 12 ? 'PM' : 'AM'
+        const hour12 = hour % 12 || 12
+        return `${hour12}:${minutes} ${ampm}`
       }
-      return new Date(`2000-01-01T${time}:00`).toLocaleTimeString('en-US', {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
-      })
+      return time
     } catch {
       return time
+    }
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'present': return 'bg-green-100 border-green-300'
+      case 'late': return 'bg-yellow-100 border-yellow-300'
+      case 'absent': return 'bg-red-100 border-red-300'
+      default: return 'bg-gray-50 border-gray-200'
+    }
+  }
+
+  const getStatusBadgeColor = (status: string) => {
+    switch (status) {
+      case 'present': return 'bg-green-500'
+      case 'late': return 'bg-yellow-500'
+      case 'absent': return 'bg-red-500'
+      default: return 'bg-gray-400'
     }
   }
 
@@ -1203,7 +966,7 @@ export default function QRScannerPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Attendance Marking</h1>
-          <p className="text-gray-600">Record attendance via QR scanner or manual entry</p>
+          <p className="text-gray-600">Record attendance via QR scanner or seat plan</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <div className="bg-green-100 text-green-800 px-3 py-1.5 rounded-lg flex items-center gap-2 text-sm font-medium">
@@ -1218,7 +981,7 @@ export default function QRScannerPage() {
             {soundEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
           </button>
           <button
-              onClick={() => fetchActiveSessions()}
+            onClick={() => fetchActiveSessions()}
             className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
             title="Refresh sessions"
           >
@@ -1228,7 +991,7 @@ export default function QRScannerPage() {
       </div>
 
       {/* Tab Navigation */}
-      <div className="bg-white rounded-xl shadow-xs border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="flex border-b border-gray-200">
           <button
             onClick={() => setActiveTab('scanner')}
@@ -1249,31 +1012,14 @@ export default function QRScannerPage() {
                 : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
             }`}
           >
-            <UserPlus className="w-5 h-5" />
-            Manual Recording
-          </button>
-          <button
-            onClick={() => markAllStudentsPresent()}
-            disabled={markAllLoading || !selectedSession}
-            className={`flex-1 py-3 px-4 font-medium flex items-center justify-center gap-2 transition-colors ${
-              markAllLoading || !selectedSession
-                ? 'text-gray-400 bg-gray-50 cursor-not-allowed'
-                : 'text-green-600 hover:text-green-700 hover:bg-green-50'
-            }`}
-            title="Mark all unmarked students as present"
-          >
-            {markAllLoading ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <CheckSquare className="w-5 h-5" />
-            )}
-            Mark All Present
+            <LayoutGrid className="w-5 h-5" />
+            Seat Plan
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-4">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
               <Scan className="w-5 h-5 text-blue-600" />
@@ -1285,7 +1031,7 @@ export default function QRScannerPage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-4">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
               <CheckCircle className="w-5 h-5 text-green-600" />
@@ -1297,7 +1043,7 @@ export default function QRScannerPage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-4">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-yellow-100 flex items-center justify-center">
               <Clock className="w-5 h-5 text-yellow-600" />
@@ -1309,7 +1055,7 @@ export default function QRScannerPage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-4">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center">
               <XCircle className="w-5 h-5 text-red-600" />
@@ -1320,21 +1066,10 @@ export default function QRScannerPage() {
             </div>
           </div>
         </div>
-
-        <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
-              <Lock className="w-5 h-5 text-purple-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Encryption</p>
-              <p className="text-sm font-bold text-purple-600">AES-256</p>
-            </div>
-          </div>
-        </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-4">
+      {/* Session Selector */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
           <label className="text-sm font-medium text-gray-700 whitespace-nowrap">
             Select Active Session:
@@ -1359,351 +1094,129 @@ export default function QRScannerPage() {
           </select>
         </div>
 
-        {selectedSessionDetails && (
-          <div className="mt-3 space-y-3">
-            {selectedSessionDetails.session_description && (
-              <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                <p className="text-sm text-gray-700">
-                  <span className="font-medium">Session Description:</span> {selectedSessionDetails.session_description}
-                </p>
-              </div>
-            )}
-            <div className="flex flex-wrap gap-4 text-sm bg-blue-50 p-3 rounded-lg">
-              <div className="flex items-center gap-2">
-                <span className="text-gray-600">Late Threshold:</span>
-                <span className="font-medium text-yellow-600">{formatTime(selectedSessionDetails.late_threshold)}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-gray-600">Absent Threshold:</span>
-                <span className="font-medium text-red-600">{formatTime(selectedSessionDetails.absent_threshold)}</span>
-              </div>
-            </div>
+        {selectedSessionDetails && selectedSessionDetails.session_description && (
+          <div className="mt-3 bg-blue-50 p-3 rounded-lg border border-blue-200">
+            <p className="text-sm text-gray-700">
+              <span className="font-medium">Session Description:</span> {selectedSessionDetails.session_description}
+            </p>
           </div>
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {activeTab === 'scanner' ? (
-          <>
-            <div className="lg:col-span-2 bg-white rounded-xl shadow-xs border border-gray-200 p-4 sm:p-6">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-                <h2 className="text-lg font-semibold text-gray-800">Camera Feed</h2>
-                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
-                  {scannerActive ? (
-                    <span className="flex items-center gap-1 text-green-600 text-sm">
-                      <Zap className="w-4 h-4" />
-                      Camera Active
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1 text-gray-600 text-sm">
-                      <ZapOff className="w-4 h-4" />
-                      Camera Off
-                    </span>
-                  )}
-                  <button
-                    onClick={scannerActive ? stopCamera : startCamera}
-                    disabled={cameraPermission === false}
-                    className={`px-4 py-2 rounded-lg transition-colors ${
-                      scannerActive 
-                        ? 'bg-red-600 hover:bg-red-700 text-white'
-                        : 'bg-blue-600 hover:bg-blue-700 text-white'
-                    } ${cameraPermission === false ? 'opacity-50 cursor-not-allowed' : ''} w-full sm:w-auto`}
-                  >
-                    {scannerActive ? 'Stop Camera' : 'Start Camera'}
-                  </button>
-                </div>
-              </div>
-
-              <div className="relative w-full aspect-3/4 sm:aspect-video max-h-[70vh] sm:max-h-none bg-gray-900 rounded-lg overflow-hidden">
-                {cameraPermission === false ? (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
-                    <CameraOff className="w-12 h-12 mb-4 opacity-50" />
-                    <p className="text-lg font-medium">Camera Access Denied</p>
-                    <p className="text-sm text-gray-400 mt-2 text-center px-4">
-                      {cameraError || 'Please allow camera access'}
-                    </p>
-                  </div>
+      {/* Main Content Area */}
+      {activeTab === 'scanner' ? (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+              <h2 className="text-lg font-semibold text-gray-800">Camera Feed</h2>
+              <div className="flex flex-wrap items-center gap-2">
+                {scannerActive ? (
+                  <span className="flex items-center gap-1 text-green-600 text-sm">
+                    <Zap className="w-4 h-4" />
+                    Camera Active
+                  </span>
                 ) : (
-                  <>
-                    <video
-                      ref={videoRef}
-                      className="absolute inset-0 w-full h-full object-cover"
-                      muted
-                      playsInline
-                      autoPlay
-                    />
-                    <canvas
-                      ref={canvasRef}
-                      className="absolute inset-0 w-full h-full"
-                      style={{ display: 'none' }}
-                    />
-                    
-                    <div className="absolute inset-0 border-2 sm:border-4 border-blue-500/30 pointer-events-none">
-                      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-40 h-40 sm:w-56 sm:h-56 lg:w-64 lg:h-64">
-                        <div className="absolute top-0 left-0 w-8 h-8 sm:w-12 sm:h-12 border-t-4 border-l-4 border-blue-500"></div>
-                        <div className="absolute top-0 right-0 w-8 h-8 sm:w-12 sm:h-12 border-t-4 border-r-4 border-blue-500"></div>
-                        <div className="absolute bottom-0 left-0 w-8 h-8 sm:w-12 sm:h-12 border-b-4 border-l-4 border-blue-500"></div>
-                        <div className="absolute bottom-0 right-0 w-8 h-8 sm:w-12 sm:h-12 border-b-4 border-r-4 border-blue-500"></div>
-                      </div>
-                    </div>
-
-                    {scannerActive && scanning && (
-                      <div className="absolute inset-0 pointer-events-none">
-                        <div className="absolute top-0 left-0 right-0 h-1 bg-linear-to-r from-transparent via-blue-500 to-transparent animate-scan"></div>
-                      </div>
-                    )}
-
-                    {/* Enhanced Processing Overlay */}
-                    {(isProcessingQR || isProcessing) && (
-                      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center z-50">
-                        <div className="relative">
-                          <div className="w-20 h-20 border-4 border-blue-500/30 rounded-full animate-ping absolute"></div>
-                          <div className="w-20 h-20 border-4 border-t-blue-500 border-r-blue-500 border-b-transparent border-l-transparent rounded-full animate-spin"></div>
-                        </div>
-                        <p className="text-white font-medium mt-4 text-lg">{processingMessage || 'Processing QR Code...'}</p>
-                        <div className="mt-3 w-48 h-1 bg-gray-700 rounded-full overflow-hidden">
-                          <div className="h-full bg-blue-500 rounded-full animate-pulse w-full"></div>
-                        </div>
-                        <p className="text-gray-300 text-sm mt-3">Please wait...</p>
-                      </div>
-                    )}
-                  </>
+                  <span className="flex items-center gap-1 text-gray-600 text-sm">
+                    <ZapOff className="w-4 h-4" />
+                    Camera Off
+                  </span>
                 )}
-              </div>
-
-              <p className="text-xs sm:text-sm text-gray-500 mt-4 text-center">
-                Position the QR code within the frame to scan automatically
-              </p>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-4 sm:p-6">
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">Scan Results</h2>
-              
-              {scanResult ? (
-                <div className={`p-4 rounded-lg ${
-                  scanResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
-                }`}>
-                  <div className="flex items-start gap-3">
-                    {scanResult.success ? (
-                      scanResult.isEncrypted ? (
-                        <Lock className="w-6 h-6 text-green-600 shrink-0" />
-                      ) : (
-                        <CheckCircle className="w-6 h-6 text-green-600 shrink-0" />
-                      )
-                    ) : (
-                      <XCircle className="w-6 h-6 text-red-600 shrink-0" />
-                    )}
-                    <div className="flex-1">
-                      <p className={`font-medium ${
-                        scanResult.success ? 'text-green-800' : 'text-red-800'
-                      }`}>
-                        {scanResult.success ? 'Attendance Marked' : 'Scan Failed'}
-                        {scanResult.isEncrypted && scanResult.success && (
-                          <span className="ml-2 inline-flex items-center gap-1 text-xs bg-green-200 text-green-800 px-2 py-0.5 rounded-full">
-                            <Lock className="w-3 h-3" />
-                            Encrypted
-                          </span>
-                        )}
-                      </p>
-                      <p className={`text-sm mt-1 ${
-                        scanResult.success ? 'text-green-600' : 'text-red-600'
-                      }`}>
-                        {scanResult.message}
-                      </p>
-                      
-                      {scanResult.student && (
-                        <div className="mt-3 pt-3 border-t border-green-200">
-                          <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 rounded-full bg-linear-to-br from-blue-100 to-purple-100 flex items-center justify-center overflow-hidden">
-                              {scanResult.student.profile_photo_base64 ? (
-                                <img 
-                                  src={scanResult.student.profile_photo_base64} 
-                                  alt={scanResult.student.full_name}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <Users className="w-6 h-6 text-blue-600" />
-                              )}
-                            </div>
-                            <div className="flex-1">
-                              <p className="font-medium text-gray-800">{scanResult.student.full_name}</p>
-                              <p className="text-sm text-gray-500">LRN: {scanResult.student.lrn}</p>
-                              <p className="text-xs text-gray-400">
-                                Grade {scanResult.student.grade} - Section {scanResult.student.section}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <QrCode className="w-10 h-10 text-gray-400" />
-                  </div>
-                  <p className="text-gray-600">No scans yet</p>
-                  <p className="text-sm text-gray-500 mt-2">
-                    {scannerActive 
-                      ? 'Scan a student QR code to see results here'
-                      : 'Start the camera to begin scanning'}
-                  </p>
-                </div>
-              )}
-
-              {stats.todayScans > 0 && (
-                <div className="mt-6">
-                  <h3 className="font-medium text-gray-700 mb-3">Today's Statistics</h3>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <span className="text-sm text-gray-600">Present:</span>
-                      <span className="font-bold text-green-600">{stats.presentCount}</span>
-                    </div>
-                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <span className="text-sm text-gray-600">Late:</span>
-                      <span className="font-bold text-yellow-600">{stats.lateCount}</span>
-                    </div>
-                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <span className="text-sm text-gray-600">Absent:</span>
-                      <span className="font-bold text-red-600">{stats.absentCount}</span>
-                    </div>
-                    <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                      <span className="text-sm text-gray-600">Total:</span>
-                      <span className="font-bold text-blue-600">{stats.todayScans}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </>
-        ) : (
-          <div className="lg:col-span-3 bg-white rounded-xl shadow-xs border border-gray-200 p-4 sm:p-6">
-            <h2 className="text-lg font-semibold text-gray-800 mb-6">Quick Student Attendance</h2>
-
-            <div className="mb-6 border border-gray-200 rounded-xl bg-white">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border-b border-gray-200 bg-gray-50 rounded-t-xl">
-                <div>
-                  <p className="text-sm font-semibold text-gray-800">Manual Unregistered Entry</p>
-                  <p className="text-xs text-gray-600 mt-1">Use this when a student is not registered yet. Enter LRN and name to save temporary attendance.</p>
-                </div>
                 <button
-                  type="button"
-                  onClick={() => setShowManualEntry((prev) => !prev)}
-                  className="px-3 py-2 text-sm font-medium rounded-lg border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors"
+                  onClick={scannerActive ? stopCamera : startCamera}
+                  disabled={cameraPermission === false}
+                  className={`px-4 py-2 rounded-lg transition-colors ${
+                    scannerActive 
+                      ? 'bg-red-600 hover:bg-red-700 text-white'
+                      : 'bg-blue-600 hover:bg-blue-700 text-white'
+                  } ${cameraPermission === false ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
-                  {showManualEntry ? 'Hide Form' : 'Add Temporary Attendance'}
+                  {scannerActive ? 'Stop Camera' : 'Start Camera'}
                 </button>
               </div>
+            </div>
 
-              {showManualEntry && (
-                <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Student LRN</label>
-                    <input
-                      type="text"
-                      value={manualLRN}
-                      onChange={(e) => setManualLRN(e.target.value)}
-                      placeholder="Enter 12-digit LRN"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Student Name</label>
-                    <input
-                      type="text"
-                      value={manualName}
-                      onChange={(e) => setManualName(e.target.value)}
-                      placeholder="Enter student full name"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="flex items-center gap-2 text-sm text-gray-700 mb-2">
-                      <input
-                        type="checkbox"
-                        checked={useManualStatus}
-                        onChange={(e) => setUseManualStatus(e.target.checked)}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      Override attendance status manually
-                    </label>
-                    {useManualStatus && (
-                      <select
-                        value={manualStatus}
-                        onChange={(e) => setManualStatus(e.target.value as 'present' | 'absent' | 'late' | 'excused')}
-                        className="w-full md:w-64 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                      >
-                        <option value="present">Present</option>
-                        <option value="late">Late</option>
-                        <option value="absent">Absent</option>
-                        <option value="excused">Excused</option>
-                      </select>
-                    )}
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Remarks (optional)</label>
-                    <textarea
-                      value={manualRemarks}
-                      onChange={(e) => setManualRemarks(e.target.value)}
-                      placeholder="Optional notes for this attendance record"
-                      rows={2}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={handleManualAttendance}
-                      disabled={tempRegistrationLoading || !selectedSession || !manualLRN.trim()}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                    >
-                      {tempRegistrationLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-                      Save Temporary Attendance
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowManualEntry(false)
-                        setManualLRN('')
-                        setManualName('')
-                        setManualRemarks('')
-                        setManualStatus('present')
-                        setUseManualStatus(false)
-                      }}
-                      className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-
-                  {!selectedSession && (
-                    <p className="md:col-span-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                      Select an active session first before recording temporary attendance.
-                    </p>
-                  )}
+            <div className="relative w-full aspect-video bg-gray-900 rounded-lg overflow-hidden">
+              {cameraPermission === false ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
+                  <CameraOff className="w-12 h-12 mb-4 opacity-50" />
+                  <p className="text-lg font-medium">Camera Access Denied</p>
+                  <p className="text-sm text-gray-400 mt-2 text-center px-4">
+                    {cameraError || 'Please allow camera access'}
+                  </p>
                 </div>
+              ) : (
+                <>
+                  <video
+                    ref={videoRef}
+                    className="absolute inset-0 w-full h-full object-cover"
+                    muted
+                    playsInline
+                    autoPlay
+                  />
+                  <canvas ref={canvasRef} style={{ display: 'none' }} />
+                  
+                  <div className="absolute inset-0 border-4 border-blue-500/30 pointer-events-none">
+                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-56 h-56">
+                      <div className="absolute top-0 left-0 w-12 h-12 border-t-4 border-l-4 border-blue-500"></div>
+                      <div className="absolute top-0 right-0 w-12 h-12 border-t-4 border-r-4 border-blue-500"></div>
+                      <div className="absolute bottom-0 left-0 w-12 h-12 border-b-4 border-l-4 border-blue-500"></div>
+                      <div className="absolute bottom-0 right-0 w-12 h-12 border-b-4 border-r-4 border-blue-500"></div>
+                    </div>
+                  </div>
+
+                  {scannerActive && scanning && (
+                    <div className="absolute inset-0 pointer-events-none">
+                      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent animate-scan"></div>
+                    </div>
+                  )}
+
+                  {(isProcessingQR || isProcessing) && (
+                    <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center z-50">
+                      <div className="relative">
+                        <div className="w-20 h-20 border-4 border-blue-500/30 rounded-full animate-ping absolute"></div>
+                        <div className="w-20 h-20 border-4 border-t-blue-500 border-r-blue-500 border-b-transparent border-l-transparent rounded-full animate-spin"></div>
+                      </div>
+                      <p className="text-white font-medium mt-4 text-lg">{processingMessage || 'Processing QR Code...'}</p>
+                      <p className="text-gray-300 text-sm mt-3">Please wait...</p>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
-            {scanResult && (
-              <div className={`p-4 rounded-lg mb-6 ${
+            <p className="text-sm text-gray-500 mt-4 text-center">
+              Position the QR code within the frame to scan automatically
+            </p>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Scan Results</h2>
+            
+            {scanResult ? (
+              <div className={`p-4 rounded-lg ${
                 scanResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
               }`}>
                 <div className="flex items-start gap-3">
                   {scanResult.success ? (
-                    <CheckCircle className="w-6 h-6 text-green-600 shrink-0 mt-0.5" />
+                    scanResult.isEncrypted ? (
+                      <Lock className="w-6 h-6 text-green-600 shrink-0" />
+                    ) : (
+                      <CheckCircle className="w-6 h-6 text-green-600 shrink-0" />
+                    )
                   ) : (
-                    <XCircle className="w-6 h-6 text-red-600 shrink-0 mt-0.5" />
+                    <XCircle className="w-6 h-6 text-red-600 shrink-0" />
                   )}
                   <div className="flex-1">
                     <p className={`font-medium ${
                       scanResult.success ? 'text-green-800' : 'text-red-800'
                     }`}>
-                      {scanResult.success ? 'Attendance Recorded' : 'Error'}
+                      {scanResult.success ? 'Attendance Marked' : 'Scan Failed'}
+                      {scanResult.isEncrypted && scanResult.success && (
+                        <span className="ml-2 inline-flex items-center gap-1 text-xs bg-green-200 text-green-800 px-2 py-0.5 rounded-full">
+                          <Lock className="w-3 h-3" />
+                          Encrypted
+                        </span>
+                      )}
                     </p>
                     <p className={`text-sm mt-1 ${
                       scanResult.success ? 'text-green-600' : 'text-red-600'
@@ -1713,121 +1226,148 @@ export default function QRScannerPage() {
                   </div>
                 </div>
               </div>
-            )}
-
-            {sectionStudents.length === 0 ? (
-              <div className="text-center py-12">
-                <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600">No students in this section</p>
-              </div>
             ) : (
-              <div className="space-y-3 max-h-[70vh] overflow-y-auto">
-                {sectionStudents.map((student) => {
-                  const isMarked = !!studentAttendanceStatus[student.id]
-                  const status = studentAttendanceStatus[student.id]
-
-                  return (
-                    <div
-                      key={student.id}
-                      className={`p-4 rounded-lg border-2 transition-all ${
-                        isMarked
-                          ? 'bg-gray-50 border-gray-300'
-                          : 'bg-white border-gray-200 hover:border-blue-300'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <div className="w-10 h-10 rounded-full bg-linear-to-br from-blue-100 to-purple-100 flex items-center justify-center shrink-0 overflow-hidden">
-                            {student.profile_photo_base64 ? (
-                              <img
-                                src={student.profile_photo_base64}
-                                alt={student.full_name}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <Users className="w-5 h-5 text-blue-600" />
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-gray-800 truncate">{student.full_name}</p>
-                            <p className="text-xs text-gray-500">LRN: {student.lrn}</p>
-                            <p className="text-xs text-gray-400">Grade {student.grade} - {student.section}</p>
-                            {isMarked && (
-                              <p className={`text-xs font-semibold mt-1 ${
-                                status === 'present' ? 'text-green-600' :
-                                status === 'late' ? 'text-yellow-600' :
-                                status === 'excused' ? 'text-blue-600' :
-                                'text-red-600'
-                              }`}>
-                                Marked as {status.toUpperCase()}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-
-                        {!isMarked ? (
-                          <div className="flex gap-2 shrink-0 flex-wrap justify-end">
-                            <button
-                              onClick={() => recordStudentAttendance(student.id, 'present')}
-                              className="px-3 py-1.5 bg-green-100 text-green-700 hover:bg-green-200 rounded-lg text-sm font-medium transition-colors"
-                            >
-                              Present
-                            </button>
-                            <button
-                              onClick={() => recordStudentAttendance(student.id, 'late')}
-                              className="px-3 py-1.5 bg-yellow-100 text-yellow-700 hover:bg-yellow-200 rounded-lg text-sm font-medium transition-colors"
-                            >
-                              Late
-                            </button>
-                            <button
-                              onClick={() => recordStudentAttendance(student.id, 'absent')}
-                              className="px-3 py-1.5 bg-red-100 text-red-700 hover:bg-red-200 rounded-lg text-sm font-medium transition-colors"
-                            >
-                              Absent
-                            </button>
-                            <button
-                              onClick={() => recordStudentAttendance(student.id, 'excused')}
-                              className="px-3 py-1.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg text-sm font-medium transition-colors"
-                            >
-                              Excused
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="text-sm font-semibold text-gray-500 shrink-0">Done</div>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-
-            {stats.todayScans > 0 && (
-              <div className="mt-8 pt-6 border-t border-gray-200">
-                <h3 className="font-medium text-gray-700 mb-4">Session Statistics</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  <div className="bg-blue-50 rounded-lg p-3 text-center">
-                    <p className="text-xs text-gray-600">Total Marked</p>
-                    <p className="text-2xl font-bold text-blue-600 mt-1">{stats.todayScans}</p>
-                  </div>
-                  <div className="bg-green-50 rounded-lg p-3 text-center">
-                    <p className="text-xs text-gray-600">Present</p>
-                    <p className="text-2xl font-bold text-green-600 mt-1">{stats.presentCount}</p>
-                  </div>
-                  <div className="bg-yellow-50 rounded-lg p-3 text-center">
-                    <p className="text-xs text-gray-600">Late</p>
-                    <p className="text-2xl font-bold text-yellow-600 mt-1">{stats.lateCount}</p>
-                  </div>
-                  <div className="bg-red-50 rounded-lg p-3 text-center">
-                    <p className="text-xs text-gray-600">Absent</p>
-                    <p className="text-2xl font-bold text-red-600 mt-1">{stats.absentCount}</p>
-                  </div>
+              <div className="text-center py-12">
+                <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <QrCode className="w-10 h-10 text-gray-400" />
                 </div>
+                <p className="text-gray-600">No scans yet</p>
+                <p className="text-sm text-gray-500 mt-2">
+                  {scannerActive 
+                    ? 'Scan a student QR code to see results here'
+                    : 'Start the camera to begin scanning'}
+                </p>
               </div>
             )}
           </div>
-        )}
-      </div>
+        </div>
+      ) : (
+        // Seat Plan View
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+              <Grid className="w-5 h-5 text-blue-600" />
+              Classroom Seat Plan
+            </h2>
+            <div className="flex items-center gap-3 text-xs">
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                <span>Present</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                <span>Late</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                <span>Absent</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 bg-gray-300 rounded-full"></div>
+                <span>Not Marked</span>
+              </div>
+            </div>
+          </div>
+
+          {sectionStudents.length === 0 ? (
+            <div className="text-center py-12">
+              <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600">No students in this section</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+              {seatArrangement.map((student, index) => {
+                const status = studentAttendanceStatus[student.id]
+                const isMarked = !!status
+                const displayName = formatStudentName(student)
+                
+                return (
+                  <div
+                    key={student.id}
+                    className={`relative group rounded-xl border-2 transition-all duration-200 ${
+                      isMarked
+                        ? status === 'present'
+                          ? 'bg-green-50 border-green-300 shadow-sm'
+                          : status === 'late'
+                          ? 'bg-yellow-50 border-yellow-300 shadow-sm'
+                          : 'bg-red-50 border-red-300 shadow-sm'
+                        : 'bg-white border-gray-200 hover:border-blue-300 hover:shadow-md'
+                    }`}
+                  >
+                    <div className="p-3">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1">
+                          <p className="font-medium text-gray-800 text-sm leading-tight line-clamp-2">
+                            {displayName}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">LRN: {student.lrn}</p>
+                        </div>
+                        
+                        {/* Hamburger Menu Button */}
+                        <div className="relative">
+                          <button
+                            onClick={() => setOpenMenuId(openMenuId === student.id ? null : student.id)}
+                            className="p-1.5 hover:bg-gray-200 rounded-lg transition-colors"
+                          >
+                            <MoreVertical className="w-4 h-4 text-gray-500" />
+                          </button>
+                          
+                          {openMenuId === student.id && (
+                            <div className="absolute right-0 top-8 z-20 w-32 bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
+                              <button
+                                onClick={() => recordStudentAttendance(student.id, 'present')}
+                                className="w-full px-3 py-2 text-left text-sm text-green-700 hover:bg-green-50 transition-colors flex items-center gap-2"
+                              >
+                                <CheckCircle className="w-3.5 h-3.5" />
+                                Present
+                              </button>
+                              <button
+                                onClick={() => recordStudentAttendance(student.id, 'late')}
+                                className="w-full px-3 py-2 text-left text-sm text-yellow-700 hover:bg-yellow-50 transition-colors flex items-center gap-2"
+                              >
+                                <Clock className="w-3.5 h-3.5" />
+                                Late
+                              </button>
+                              <button
+                                onClick={() => recordStudentAttendance(student.id, 'absent')}
+                                className="w-full px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50 transition-colors flex items-center gap-2"
+                              >
+                                <XCircle className="w-3.5 h-3.5" />
+                                Absent
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Status Indicator */}
+                      {isMarked && (
+                        <div className="mt-2 pt-2 border-t border-current border-opacity-20">
+                          <div className="flex items-center gap-1.5">
+                            <div className={`w-2 h-2 rounded-full ${getStatusBadgeColor(status)} animate-pulse`}></div>
+                            <span className={`text-xs font-semibold ${
+                              status === 'present' ? 'text-green-600' :
+                              status === 'late' ? 'text-yellow-600' :
+                              'text-red-600'
+                            }`}>
+                              {status.toUpperCase()}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Seat Number */}
+                    <div className="absolute -top-2 -left-2 w-6 h-6 rounded-full bg-gray-200 text-gray-600 text-xs flex items-center justify-center font-medium">
+                      {index + 1}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="bg-blue-50 rounded-xl p-4 sm:p-6 border border-blue-200">
         <div className="flex items-start gap-3">
@@ -1835,11 +1375,28 @@ export default function QRScannerPage() {
           <div>
             <h3 className="font-medium text-blue-800">Secure Attendance System</h3>
             <p className="text-sm text-blue-700 mt-1">
-              QR codes are encrypted end-to-end. Manual attendance remains available for fallback and quick classroom operations.
+              QR codes are encrypted end-to-end. Seat plan view allows quick attendance marking via the menu button.
+              {activeTab === 'manual' && " Click the ⋮ menu on any student card to mark attendance."}
             </p>
           </div>
         </div>
       </div>
+
+      <style jsx>{`
+        @keyframes scan {
+          0% { transform: translateY(0); }
+          100% { transform: translateY(100vh); }
+        }
+        .animate-scan {
+          animation: scan 2s linear infinite;
+        }
+        .line-clamp-2 {
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+      `}</style>
     </div>
   )
 }
