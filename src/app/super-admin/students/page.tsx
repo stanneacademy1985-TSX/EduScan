@@ -64,13 +64,10 @@ const formatFullName = (fullName: string): string => {
   const nameParts = fullName.trim().split(/\s+/)
   
   if (nameParts.length === 1) {
-    // Only first name
     return capitalizeName(nameParts[0])
   } else if (nameParts.length === 2) {
-    // First and Last name only
     return `${capitalizeName(nameParts[0])} ${capitalizeName(nameParts[1])}`
   } else if (nameParts.length >= 3) {
-    // First, Middle, Last name - format as "First M. Last"
     const firstName = capitalizeName(nameParts[0])
     const middleInitial = nameParts[1].charAt(0).toUpperCase()
     const lastName = capitalizeName(nameParts[nameParts.length - 1])
@@ -90,7 +87,7 @@ const capitalizeName = (name: string): string => {
     .join(' ')
 }
 
-// Helper function to format name for editing (store full name properly)
+// Helper function to format name for storage
 const formatNameForStorage = (firstName: string, middleName: string, lastName: string): string => {
   const parts = []
   if (firstName) parts.push(capitalizeName(firstName))
@@ -121,7 +118,7 @@ export default function SuperAdminStudentsPage() {
   // Filters
   const [filterTeacher, setFilterTeacher] = useState('all')
   const [filterGrade, setFilterGrade] = useState('all')
-  const [filterAssignment, setFilterAssignment] = useState('all') // all, assigned, unassigned
+  const [filterAssignment, setFilterAssignment] = useState('all')
   
   const [showAssignModal, setShowAssignModal] = useState(false)
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
@@ -164,7 +161,6 @@ export default function SuperAdminStudentsPage() {
     try {
       setLoading(true)
       
-      // Fetch all students
       const { data: studentsData, error: studentsError } = await supabase
         .from('students')
         .select('id, lrn, full_name, email, grade, section, contact_number, profile_photo_url, profile_photo_base64')
@@ -173,7 +169,6 @@ export default function SuperAdminStudentsPage() {
 
       if (studentsError) throw studentsError
 
-      // Fetch all teachers
       const { data: teachersData, error: teachersError } = await supabase
         .from('admin_users')
         .select('id, full_name, assigned_grade')
@@ -182,26 +177,22 @@ export default function SuperAdminStudentsPage() {
       if (teachersError) throw teachersError
       setTeachers(teachersData || [])
 
-      // Fetch student-teacher assignments
       const { data: assignments, error: assignmentsError } = await supabase
         .from('student_teacher_assignments')
         .select('student_id, teacher_id')
 
       if (assignmentsError) throw assignmentsError
 
-      // Create assignment map
       const assignmentMap = new Map()
       assignments?.forEach((assign: StudentTeacherAssignment) => {
         assignmentMap.set(assign.student_id, assign.teacher_id)
       })
 
-      // Create teacher name map
       const teacherNameMap = new Map()
       teachersData?.forEach((teacher: Teacher) => {
         teacherNameMap.set(teacher.id, formatFullName(teacher.full_name))
       })
 
-      // Combine data with formatted names
       const studentsWithAssignment = (studentsData || []).map((student: StudentRow) => {
         const teacherId = assignmentMap.get(student.id)
         return {
@@ -227,7 +218,6 @@ export default function SuperAdminStudentsPage() {
   const filterStudents = () => {
     let filtered = [...students]
 
-    // Search filter
     if (searchTerm) {
       const term = searchTerm.toLowerCase()
       filtered = filtered.filter(student =>
@@ -237,17 +227,14 @@ export default function SuperAdminStudentsPage() {
       )
     }
 
-    // Teacher filter
     if (filterTeacher !== 'all') {
       filtered = filtered.filter(student => student.teacher_id === filterTeacher)
     }
 
-    // Grade filter
     if (filterGrade !== 'all') {
       filtered = filtered.filter(student => student.grade === filterGrade)
     }
 
-    // Assignment filter
     if (filterAssignment === 'assigned') {
       filtered = filtered.filter(student => student.is_assigned)
     } else if (filterAssignment === 'unassigned') {
@@ -295,7 +282,6 @@ export default function SuperAdminStudentsPage() {
   const handleEditSave = async () => {
     if (!selectedStudent) return
 
-    // Format the full name with proper capitalization
     const formattedFullName = formatNameForStorage(editFirstName, editMiddleName, editLastName)
 
     setSavingStudent(true)
@@ -313,19 +299,18 @@ export default function SuperAdminStudentsPage() {
 
       if (error) throw error
 
-      // Format the name for display
       const formattedDisplayName = formatFullName(formattedFullName)
 
-      setStudents(prev => prev.map(student => (
+      setStudents(prev => prev.map(student => 
         student.id === selectedStudent.id
           ? { ...student, ...editedStudent, full_name: formattedDisplayName } as Student
           : student
-      )))
-      setFilteredStudents(prev => prev.map(student => (
+      ))
+      setFilteredStudents(prev => prev.map(student => 
         student.id === selectedStudent.id
           ? { ...student, ...editedStudent, full_name: formattedDisplayName } as Student
           : student
-      )))
+      ))
 
       setMessage({ type: 'success', text: 'Student updated successfully' })
       setShowEditModal(false)
@@ -335,28 +320,6 @@ export default function SuperAdminStudentsPage() {
       setMessage({ type: 'error', text: message })
     } finally {
       setSavingStudent(false)
-    }
-  }
-
-  const handleUnassignStudent = async (studentId: string, studentName: string) => {
-    if (!confirm(`Remove ${studentName} from their current teacher?`)) return
-
-    try {
-      // Find the teacher this student is assigned to
-      const { data: assignment } = await supabase
-        .from('student_teacher_assignments')
-        .select('teacher_id')
-        .eq('student_id', studentId)
-        .single()
-
-      if (assignment) {
-        await SuperAdminService.removeStudentFromTeacher(assignment.teacher_id, studentId)
-        setMessage({ type: 'success', text: `Student unassigned successfully` })
-        fetchData()
-      }
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Failed to unassign student'
-      setMessage({ type: 'error', text: message })
     }
   }
 
@@ -541,7 +504,6 @@ export default function SuperAdminStudentsPage() {
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Search */}
           <div className="relative md:col-span-2">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input
@@ -553,7 +515,6 @@ export default function SuperAdminStudentsPage() {
             />
           </div>
 
-          {/* Teacher Filter */}
           <select
             value={filterTeacher}
             onChange={(e) => setFilterTeacher(e.target.value)}
@@ -568,7 +529,6 @@ export default function SuperAdminStudentsPage() {
             ))}
           </select>
 
-          {/* Grade Filter */}
           <select
             value={filterGrade}
             onChange={(e) => setFilterGrade(e.target.value)}
@@ -581,7 +541,6 @@ export default function SuperAdminStudentsPage() {
             ))}
           </select>
 
-          {/* Assignment Filter */}
           <select
             value={filterAssignment}
             onChange={(e) => setFilterAssignment(e.target.value)}
@@ -593,7 +552,6 @@ export default function SuperAdminStudentsPage() {
           </select>
         </div>
 
-        {/* Active Filters Reset */}
         {(filterTeacher !== 'all' || filterGrade !== 'all' || filterAssignment !== 'all' || searchTerm) && (
           <div className="mt-4 flex items-center gap-2">
             <button
@@ -648,7 +606,7 @@ export default function SuperAdminStudentsPage() {
                     <tr key={student.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-linear-to-br from-indigo-100 to-purple-100 flex items-center justify-center overflow-hidden">
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center overflow-hidden">
                             {student.profile_photo_base64 || student.profile_photo_url ? (
                               <img
                                 src={student.profile_photo_base64 || student.profile_photo_url || ''}
@@ -745,8 +703,8 @@ export default function SuperAdminStudentsPage() {
                             )}
                           </div>
                         </div>
-                       </td>
-                    </table>
+                      </td>
+                    </tr>
                   ))}
                 </tbody>
               </table>
@@ -851,9 +809,10 @@ export default function SuperAdminStudentsPage() {
         </div>
       )}
 
+      {/* View Student Modal */}
       {showViewModal && viewStudent && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowViewModal(false)}>
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-xl" onClick={(event) => event.stopPropagation()}>
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-4 mb-6">
               <div>
                 <h3 className="text-2xl font-bold text-gray-800">Student Details</h3>
@@ -882,9 +841,10 @@ export default function SuperAdminStudentsPage() {
         </div>
       )}
 
+      {/* Edit Student Modal */}
       {showEditModal && selectedStudent && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowEditModal(false)}>
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-xl max-h-[90vh] overflow-y-auto" onClick={(event) => event.stopPropagation()}>
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-4 mb-6">
               <div>
                 <h3 className="text-2xl font-bold text-gray-800">Edit Student</h3>
@@ -971,6 +931,7 @@ export default function SuperAdminStudentsPage() {
         </div>
       )}
 
+      {/* Delete Confirm Modal */}
       {showDeleteConfirm && studentToDelete && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl">
