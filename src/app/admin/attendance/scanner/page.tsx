@@ -999,11 +999,11 @@ export default function QRScannerPage() {
         <head>
           <title>Seat Plan - ${sessionInfo}</title>
           <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
           <style>
             @page {
               size: landscape;
-              margin: 1cm;
+              margin: 0.5cm;
             }
             
             * {
@@ -1016,7 +1016,9 @@ export default function QRScannerPage() {
               font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Roboto', 'Helvetica Neue', sans-serif;
               background: white;
               color: #1f2937;
-              padding: 20px;
+              padding: 10px;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
             }
             
             .container {
@@ -1027,21 +1029,21 @@ export default function QRScannerPage() {
             /* Header Styles */
             .header {
               text-align: center;
-              margin-bottom: 2rem;
-              padding-bottom: 1rem;
+              margin-bottom: 1.5rem;
+              padding-bottom: 0.75rem;
+              border-bottom: 2px solid #e5e7eb;
             }
             
             .school-name {
-              font-size: 1.3rem;
-              font-weight: 600;
+              font-size: 1.2rem;
+              font-weight: 700;
               color: #1e40af;
-              letter-spacing: -0.3px;
               margin-bottom: 0.3rem;
             }
             
             .header h1 {
-              font-size: 1.8rem;
-              font-weight: 700;
+              font-size: 1.6rem;
+              font-weight: 800;
               color: #111827;
               margin-bottom: 0.3rem;
             }
@@ -1049,103 +1051,84 @@ export default function QRScannerPage() {
             .session-info {
               font-size: 1.1rem;
               color: #4b5563;
-              font-weight: 500;
-              margin-top: 0.2rem;
+              font-weight: 600;
             }
             
             .date-info {
-              font-size: 0.85rem;
+              font-size: 0.8rem;
               color: #6b7280;
-              margin-top: 0.2rem;
+              margin-top: 0.3rem;
             }
             
-            /* Seat Grid - Responsive with larger cards */
+            /* Seat Grid - MUCH LARGER cards for mobile */
             .seat-grid {
               display: grid;
-              grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+              grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
               gap: 1.5rem;
               padding: 0.5rem;
               margin-top: 1.5rem;
             }
             
-            /* Elegant Seat Card - Larger Size */
+            /* Large Elegant Seat Card */
             .seat-card {
               background: white;
-              border: 2px solid #e5e7eb;
-              border-radius: 20px;
-              padding: 1.75rem 1rem;
+              border: 2.5px solid #e5e7eb;
+              border-radius: 24px;
+              padding: 2rem 1rem;
               text-align: center;
               position: relative;
               page-break-inside: avoid;
               break-inside: avoid;
-              box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-              transition: all 0.2s;
-              min-height: 130px;
+              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+              min-height: 200px;
               display: flex;
               flex-direction: column;
               align-items: center;
               justify-content: center;
             }
             
-            /* Seat Number Badge - More prominent */
+            /* Large Seat Number Badge */
             .seat-number {
               position: absolute;
-              top: -14px;
-              left: -14px;
-              width: 36px;
-              height: 36px;
+              top: -18px;
+              left: -18px;
+              width: 48px;
+              height: 48px;
               background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
               color: white;
               border-radius: 50%;
               display: flex;
               align-items: center;
               justify-content: center;
-              font-size: 0.9rem;
+              font-size: 1.2rem;
               font-weight: 800;
-              box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
-              border: 2px solid white;
+              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+              border: 3px solid white;
             }
             
-            /* Student Name - Larger text */
+            /* Student Name - Much Larger Text */
             .student-name {
-              font-size: 1.1rem;
-              font-weight: 700;
+              font-size: 1.5rem;
+              font-weight: 800;
               color: #111827;
-              margin-bottom: 0.5rem;
+              margin-bottom: 0.75rem;
               word-break: break-word;
-              line-height: 1.4;
+              line-height: 1.3;
             }
             
             /* Student Details */
             .student-details {
-              font-size: 0.75rem;
-              color: #9ca3af;
-              margin-top: 0.25rem;
+              font-size: 0.9rem;
+              color: #6b7280;
+              margin-top: 0.5rem;
             }
             
-            .student-lrn {
-              font-size: 0.7rem;
-              color: #9ca3af;
-              font-family: monospace;
-              letter-spacing: 0.5px;
-            }
-            
-            /* Simple divider line (no status colors) */
+            /* Simple divider line */
             .card-divider {
-              width: 80%;
+              width: 60%;
               height: 2px;
-              background: #e5e7eb;
-              margin: 0.75rem auto 0.5rem;
-              border-radius: 1px;
-            }
-            
-            /* Simple status text - neutral, no colored badges */
-            .status-text {
-              font-size: 0.7rem;
-              color: #9ca3af;
-              font-weight: 500;
-              text-transform: uppercase;
-              letter-spacing: 0.5px;
+              background: linear-gradient(90deg, transparent, #e5e7eb, transparent);
+              margin: 1rem auto 0.75rem;
             }
             
             /* Footer */
@@ -1171,8 +1154,6 @@ export default function QRScannerPage() {
             /* Print-specific optimizations */
             @media print {
               body {
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
                 padding: 0;
                 margin: 0;
               }
@@ -1182,55 +1163,102 @@ export default function QRScannerPage() {
                 page-break-inside: avoid;
                 border-color: #d1d5db;
                 box-shadow: none;
+                min-height: 180px;
+                padding: 1.5rem 0.75rem;
               }
               
               .seat-grid {
-                gap: 1.2rem;
-              }
-            }
-            
-            /* Responsive adjustments */
-            @media (max-width: 768px) {
-              .seat-grid {
-                grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
                 gap: 1rem;
+                grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
               }
               
               .student-name {
-                font-size: 0.95rem;
+                font-size: 1.3rem;
+              }
+            }
+            
+            /* Tablet Responsive */
+            @media (max-width: 1024px) and (min-width: 769px) {
+              .seat-grid {
+                grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+                gap: 1.25rem;
+              }
+              
+              .student-name {
+                font-size: 1.4rem;
               }
               
               .seat-card {
-                padding: 1.25rem 0.75rem;
-                min-height: 110px;
+                min-height: 190px;
+              }
+            }
+            
+            /* Mobile Responsive - No zoom needed, cards take full width */
+            @media (max-width: 768px) {
+              body {
+                padding: 15px;
+              }
+              
+              .seat-grid {
+                grid-template-columns: 1fr;
+                gap: 1.25rem;
+              }
+              
+              .student-name {
+                font-size: 1.6rem;
+              }
+              
+              .seat-card {
+                padding: 2rem 1rem;
+                min-height: 220px;
               }
               
               .seat-number {
-                width: 30px;
-                height: 30px;
-                font-size: 0.8rem;
-                top: -12px;
-                left: -12px;
+                width: 52px;
+                height: 52px;
+                font-size: 1.3rem;
+                top: -20px;
+                left: -20px;
+              }
+              
+              .student-details {
+                font-size: 1rem;
               }
               
               .header h1 {
                 font-size: 1.4rem;
               }
+              
+              .session-info {
+                font-size: 1rem;
+              }
             }
             
+            /* Small Mobile Devices */
             @media (max-width: 480px) {
               .seat-grid {
-                grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-                gap: 0.8rem;
+                gap: 1rem;
               }
               
               .student-name {
-                font-size: 0.85rem;
+                font-size: 1.4rem;
               }
               
               .seat-card {
-                padding: 1rem 0.5rem;
-                min-height: 95px;
+                padding: 1.75rem 0.75rem;
+                min-height: 200px;
+              }
+              
+              .seat-number {
+                width: 48px;
+                height: 48px;
+                font-size: 1.2rem;
+                top: -18px;
+                left: -18px;
+              }
+              
+              .header h1 {
+                font-size: 1.3rem;
               }
             }
           </style>
@@ -1255,10 +1283,10 @@ export default function QRScannerPage() {
                     <div class="seat-number">${index + 1}</div>
                     <div class="student-name">${displayName}</div>
                     <div class="student-details">
-                      ${student.sex ? `<span>${student.sex}</span>` : ''}
+                      ${student.sex ? `${student.sex}` : 'Student'}
                     </div>
                     <div class="card-divider"></div>
-                    <div class="status-text">
+                    <div class="student-details">
                       Seat #${index + 1}
                     </div>
                   </div>
@@ -1727,7 +1755,7 @@ export default function QRScannerPage() {
             )}
           </div>
 
-          {/* Seat Plan Grid - Larger Cards */}
+          {/* Seat Plan Grid - Much Larger Cards */}
           <div className="p-6">
             {sectionStudents.length === 0 ? (
               <div className="text-center py-12">
@@ -1735,7 +1763,7 @@ export default function QRScannerPage() {
                 <p className="text-gray-600">No students in this section</p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
                 {seatArrangement.map((student, index) => {
                   const status = studentAttendanceStatus[student.id]
                   const isMarked = !!status
@@ -1759,26 +1787,26 @@ export default function QRScannerPage() {
                       } ${isMarkingMode && attendanceMode && !isMarked ? 'hover:scale-105 transition-transform' : ''}`}
                     >
                       {/* Seat Number Badge */}
-                      <div className="absolute -top-3 -left-3 w-8 h-8 rounded-full bg-gradient-to-br from-gray-700 to-gray-800 text-white text-sm font-bold flex items-center justify-center shadow-lg">
+                      <div className="absolute -top-3 -left-3 w-10 h-10 rounded-full bg-gradient-to-br from-gray-700 to-gray-800 text-white text-base font-bold flex items-center justify-center shadow-lg">
                         {index + 1}
                       </div>
                       
-                      <div className="p-4 pt-6">
+                      <div className="p-5 pt-7">
                         <div className="text-center">
-                          <p className="font-bold text-gray-800 text-base leading-tight">
+                          <p className="font-bold text-gray-800 text-lg leading-tight">
                             {displayName}
                           </p>
                         </div>
                         
-                        {/* Status Indicator - Large Badge */}
+                        {/* Status Indicator */}
                         {isMarked && (
                           <div className="mt-4 pt-3 border-t border-current border-opacity-20">
-                            <div className={`text-center py-1.5 px-2 rounded-lg ${
+                            <div className={`text-center py-2 px-3 rounded-lg ${
                               status === 'present' ? 'bg-green-200 text-green-800' :
                               status === 'late' ? 'bg-yellow-200 text-yellow-800' :
                               'bg-red-200 text-red-800'
                             }`}>
-                              <span className="text-xs font-bold uppercase tracking-wide">
+                              <span className="text-sm font-bold uppercase tracking-wide">
                                 {status}
                               </span>
                             </div>
@@ -1788,16 +1816,16 @@ export default function QRScannerPage() {
                         {/* Empty state placeholder for unmarked */}
                         {!isMarked && isMarkingMode && attendanceMode && (
                           <div className="mt-4 pt-3 text-center">
-                            <div className="text-xs text-gray-400 italic">Click to mark</div>
+                            <div className="text-sm text-gray-400 italic">Click to mark</div>
                           </div>
                         )}
                         
                         {/* Hover instruction for marking mode */}
                         {isMarkingMode && attendanceMode && !isMarked && (
                           <div className="absolute inset-0 bg-black/70 rounded-xl flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Fingerprint className="w-8 h-8 text-white mb-2" />
-                            <p className="text-white text-sm font-medium">Click to mark</p>
-                            <p className="text-white text-xs capitalize mt-1">{attendanceMode}</p>
+                            <Fingerprint className="w-10 h-10 text-white mb-2" />
+                            <p className="text-white text-base font-medium">Click to mark</p>
+                            <p className="text-white text-sm capitalize mt-1">{attendanceMode}</p>
                           </div>
                         )}
                       </div>
