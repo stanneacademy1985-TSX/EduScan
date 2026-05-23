@@ -39,7 +39,9 @@ import {
   Loader2,
   ArrowLeft,
   FileText,
-  QrCode
+  QrCode,
+  UserCheck,
+  UserX
 } from 'lucide-react'
 
 interface Student {
@@ -74,6 +76,30 @@ interface Student {
   previous_elementary?: string | null
   previous_high_school?: string | null
   previous_shs?: string | null
+}
+
+// Helper function to capitalize first letter of each word
+const capitalizeName = (name: string): string => {
+  if (!name) return ''
+  return name
+    .toLowerCase()
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+}
+
+// Format student full name for display
+const formatStudentName = (firstName: string, middleName: string | null, lastName: string): string => {
+  const first = capitalizeName(firstName || '')
+  const last = capitalizeName(lastName || '')
+  
+  if (!first && !last) return 'Unknown Student'
+  
+  if (middleName && middleName.trim()) {
+    const middleInitial = middleName.trim().charAt(0).toUpperCase()
+    return `${first} ${middleInitial}. ${last}`
+  }
+  return `${first} ${last}`.trim()
 }
 
 export default function StudentsPage() {
@@ -167,7 +193,7 @@ export default function StudentsPage() {
         .from('students')
         .select('*')
         .in('grade', ['11', '12'])
-        .order('created_at', { ascending: false })
+        .order('first_name', { ascending: true })
 
       if (assignedStudentIds !== null) {
         query = query.in('id', assignedStudentIds)
@@ -176,7 +202,14 @@ export default function StudentsPage() {
       const { data, error } = await query
 
       if (error) throw error
-      setStudents(data || [])
+      
+      // Format student names for display
+      const formattedStudents = (data || []).map((student: Student) => ({
+        ...student,
+        full_name: formatStudentName(student.first_name, student.middle_name, student.last_name)
+      }))
+      
+      setStudents(formattedStudents)
     } catch (error) {
       console.error('Error fetching students:', error)
     } finally {
@@ -209,7 +242,10 @@ export default function StudentsPage() {
   }
 
   const handleViewStudent = (student: Student) => {
-    setSelectedStudent(student)
+    setSelectedStudent({
+      ...student,
+      full_name: formatStudentName(student.first_name, student.middle_name, student.last_name)
+    })
     setEditedStudent(student)
     setIsEditing(false)
     setShowStudentModal(true)
@@ -240,7 +276,6 @@ export default function StudentsPage() {
 
       if (error) throw error
 
-      // Refresh student list
       fetchStudents()
       setShowDeleteConfirm(false)
       setStudentToDelete(null)
@@ -276,11 +311,9 @@ export default function StudentsPage() {
           student[header] = (values[index] || '').trim()
         })
 
-        const fullName = `${student.first_name || ''} ${student.middle_name ? student.middle_name + ' ' : ''}${student.last_name || ''}`.trim()
         return {
           ...student,
           section: 'SHS',
-          full_name: fullName,
           guardian_name: student.guardian_name || null,
           guardian_contact: student.guardian_contact || null,
           emergency_contact: student.emergency_contact || null
@@ -358,6 +391,9 @@ export default function StudentsPage() {
   const handleExportCSV = () => {
     const headers = [
       'LRN',
+      'First Name',
+      'Middle Name',
+      'Last Name',
       'Full Name',
       'Grade',
       'Email',
@@ -368,8 +404,10 @@ export default function StudentsPage() {
     ]
 
     const csvData = filteredStudents.map(student => [
-      // Force LRN to be treated as text by adding equals sign and quotes
       `="${student.lrn}"`,
+      student.first_name,
+      student.middle_name || '',
+      student.last_name,
       student.full_name,
       student.grade,
       student.email,
@@ -379,9 +417,7 @@ export default function StudentsPage() {
       student.address
     ])
 
-    // Add BOM for UTF-8 to handle special characters
     const BOM = "\uFEFF"
-    
     const csvContent = [
       headers.join(','),
       ...csvData.map(row => row.join(','))
@@ -404,9 +440,9 @@ export default function StudentsPage() {
     const file = e.target.files?.[0]
     if (!file || !selectedStudent) return
 
-    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif']
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
     if (!validTypes.includes(file.type)) {
-      setMessage({ type: 'error', text: 'Please upload a valid image file (JPEG, PNG, GIF)' })
+      setMessage({ type: 'error', text: 'Please upload a valid image file (JPEG, PNG, GIF, WebP)' })
       return
     }
 
@@ -437,7 +473,6 @@ export default function StudentsPage() {
       setSelectedStudent(prev => prev ? { ...prev, profile_photo_base64: photoBase64 } : null)
       setEditedStudent(prev => ({ ...prev, profile_photo_base64: photoBase64 }))
 
-      // Update in students list
       setStudents(prev => prev.map(s => 
         s.id === selectedStudent.id ? { ...s, profile_photo_base64: photoBase64 } : s
       ))
@@ -468,7 +503,6 @@ export default function StudentsPage() {
       setSelectedStudent(prev => prev ? { ...prev, profile_photo_base64: undefined } : null)
       setEditedStudent(prev => ({ ...prev, profile_photo_base64: undefined }))
 
-      // Update in students list
       setStudents(prev => prev.map(s => 
         s.id === selectedStudent.id ? { ...s, profile_photo_base64: undefined } : s
       ))
@@ -493,9 +527,9 @@ export default function StudentsPage() {
       const { error } = await supabase
         .from('students')
         .update({
-          first_name: editedStudent.first_name,
-          middle_name: editedStudent.middle_name,
-          last_name: editedStudent.last_name,
+          first_name: capitalizeName(editedStudent.first_name || ''),
+          middle_name: capitalizeName(editedStudent.middle_name || ''),
+          last_name: capitalizeName(editedStudent.last_name || ''),
           contact_number: editedStudent.contact_number,
           address: editedStudent.address,
           date_of_birth: editedStudent.date_of_birth,
@@ -505,11 +539,11 @@ export default function StudentsPage() {
           previous_elementary: editedStudent.previous_elementary,
           previous_high_school: editedStudent.previous_high_school,
           previous_shs: editedStudent.previous_shs,
-          father_name: editedStudent.father_name,
+          father_name: capitalizeName(editedStudent.father_name || ''),
           father_occupation: editedStudent.father_occupation,
-          mother_name: editedStudent.mother_name,
+          mother_name: capitalizeName(editedStudent.mother_name || ''),
           mother_occupation: editedStudent.mother_occupation,
-          guardian_name: editedStudent.guardian_name,
+          guardian_name: capitalizeName(editedStudent.guardian_name || ''),
           guardian_contact: editedStudent.guardian_contact,
           medical_conditions: editedStudent.medical_conditions,
           medications: editedStudent.medications,
@@ -520,12 +554,29 @@ export default function StudentsPage() {
 
       if (error) throw error
 
-      // Update in students list
+      const updatedFullName = formatStudentName(
+        editedStudent.first_name || '',
+        editedStudent.middle_name || '',
+        editedStudent.last_name || ''
+      )
+
+      const updatedStudent = { 
+        ...selectedStudent, 
+        ...editedStudent,
+        first_name: capitalizeName(editedStudent.first_name || ''),
+        middle_name: capitalizeName(editedStudent.middle_name || ''),
+        last_name: capitalizeName(editedStudent.last_name || ''),
+        full_name: updatedFullName,
+        father_name: capitalizeName(editedStudent.father_name || ''),
+        mother_name: capitalizeName(editedStudent.mother_name || ''),
+        guardian_name: capitalizeName(editedStudent.guardian_name || '')
+      }
+
       setStudents(prev => prev.map(s => 
-        s.id === selectedStudent.id ? { ...s, ...editedStudent } : s
+        s.id === selectedStudent.id ? updatedStudent : s
       ))
 
-      setSelectedStudent(prev => prev ? { ...prev, ...editedStudent } : null)
+      setSelectedStudent(updatedStudent)
       
       setIsEditing(false)
       setMessage({ type: 'success', text: 'Student information updated successfully!' })
@@ -547,14 +598,12 @@ export default function StudentsPage() {
 
   const grades = getUniqueGrades()
 
-  // Pagination
   const totalPages = Math.ceil(filteredStudents.length / itemsPerPage)
   const paginatedStudents = filteredStudents.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   )
 
-  // Show loading while checking auth
   if (authChecking) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-indigo-50 to-purple-50">
@@ -576,10 +625,25 @@ export default function StudentsPage() {
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Student Management</h1>
           <p className="text-gray-600 mt-1">Manage student records and information</p>
         </div>
+        <div className="flex gap-2">
+          <button
+            onClick={handleExportCSV}
+            className="flex items-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-all shadow-sm"
+          >
+            <Download className="w-4 h-4" />
+            Export CSV
+          </button>
+          <button
+            onClick={() => setShowBulkImportModal(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all shadow-sm"
+          >
+            <FileText className="w-4 h-4" />
+            Import CSV
+          </button>
+        </div>
       </div>
 
       {/* Bulk Import Modal */}
-
       {showBulkImportModal && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-xl border border-gray-200">
@@ -590,10 +654,16 @@ export default function StudentsPage() {
               </div>
               <button onClick={() => setShowBulkImportModal(false)} className="text-gray-400 hover:text-gray-700">✕</button>
             </div>
-            <input type="file" accept=".csv" onChange={handleBulkCsvUpload} className="w-full border p-2 rounded" />
+            <input type="file" accept=".csv" onChange={handleBulkCsvUpload} className="w-full border p-2 rounded" disabled={bulkImporting} />
+            {bulkImporting && (
+              <div className="flex items-center justify-center gap-2 mt-3">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="text-sm">Processing...</span>
+              </div>
+            )}
             <p className="text-xs text-gray-500 mt-2">Required columns: lrn,first_name,last_name,grade (others allowed: middle_name,email,contact_number,address,guardian_name,guardian_contact,emergency_contact,medical_conditions,medications,allergies).</p>
             <div className="mt-4 flex justify-end gap-3">
-              <button onClick={() => setShowBulkImportModal(false)} className="px-4 py-2 border rounded">Close</button>
+              <button onClick={() => setShowBulkImportModal(false)} className="px-4 py-2 border rounded-lg hover:bg-gray-50">Close</button>
             </div>
             {bulkImportMessage.text && <p className={`mt-3 text-sm ${bulkImportMessage.type === 'success' ? 'text-emerald-600' : 'text-rose-600'}`}>{bulkImportMessage.text}</p>}
           </div>
@@ -601,7 +671,7 @@ export default function StudentsPage() {
       )}
 
       {/* Stats Summary */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
           <div className="flex items-center justify-between">
             <div>
@@ -617,11 +687,23 @@ export default function StudentsPage() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Grade Levels</p>
-              <p className="text-2xl font-bold text-gray-800 mt-1">{grades.length - 1}</p>
+              <p className="text-sm font-medium text-gray-600">Grade 11</p>
+              <p className="text-2xl font-bold text-gray-800 mt-1">{students.filter(s => s.grade === '11').length}</p>
             </div>
-            <div className="w-12 h-12 rounded-xl bg-linear-to-br from-green-100 to-emerald-100 flex items-center justify-center">
-              <GraduationCap className="w-6 h-6 text-green-600" />
+            <div className="w-12 h-12 rounded-xl bg-linear-to-br from-blue-100 to-cyan-100 flex items-center justify-center">
+              <GraduationCap className="w-6 h-6 text-blue-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Grade 12</p>
+              <p className="text-2xl font-bold text-gray-800 mt-1">{students.filter(s => s.grade === '12').length}</p>
+            </div>
+            <div className="w-12 h-12 rounded-xl bg-linear-to-br from-purple-100 to-pink-100 flex items-center justify-center">
+              <GraduationCap className="w-6 h-6 text-purple-600" />
             </div>
           </div>
         </div>
@@ -646,7 +728,6 @@ export default function StudentsPage() {
           <h2 className="font-semibold text-gray-700">Filter Students</h2>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-          {/* Search */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
@@ -658,7 +739,6 @@ export default function StudentsPage() {
             />
           </div>
 
-          {/* Grade Filter */}
           <select
             value={selectedGrade}
             onChange={(e) => setSelectedGrade(e.target.value)}
@@ -671,7 +751,6 @@ export default function StudentsPage() {
             ))}
           </select>
 
-          {/* Reset Filters */}
           <button
             onClick={() => {
               setSearchTerm('')
@@ -704,60 +783,63 @@ export default function StudentsPage() {
               </div>
             </div>
           ) : (
-            paginatedStudents.map((student) => (
-              <div key={student.id} className="rounded-xl border border-gray-200 p-3 bg-white">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-linear-to-br from-indigo-100 to-purple-100 flex items-center justify-center shadow-sm border-2 border-white shrink-0">
-                    {student.profile_photo_base64 || student.profile_photo_url ? (
-                      <img
-                        src={student.profile_photo_base64 || student.profile_photo_url || ''}
-                        alt={student.full_name}
-                        className="w-12 h-12 rounded-full object-cover"
-                      />
-                    ) : (
-                      <User className="w-6 h-6 text-indigo-600" />
-                    )}
+            paginatedStudents.map((student) => {
+              const displayName = formatStudentName(student.first_name, student.middle_name, student.last_name)
+              return (
+                <div key={student.id} className="rounded-xl border border-gray-200 p-3 bg-white">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-full bg-linear-to-br from-indigo-100 to-purple-100 flex items-center justify-center shadow-sm border-2 border-white shrink-0">
+                      {student.profile_photo_base64 || student.profile_photo_url ? (
+                        <img
+                          src={student.profile_photo_base64 || student.profile_photo_url || ''}
+                          alt={displayName}
+                          className="w-12 h-12 rounded-full object-cover"
+                        />
+                      ) : (
+                        <User className="w-6 h-6 text-indigo-600" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-gray-900 truncate">{displayName}</p>
+                      <p className="text-xs text-gray-500 truncate">{student.email}</p>
+                      <p className="text-xs text-gray-600 mt-1">LRN: {student.lrn}</p>
+                      <p className="text-xs text-gray-600">Grade {student.grade}</p>
+                    </div>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-gray-900 truncate">{student.full_name}</p>
-                    <p className="text-xs text-gray-500 truncate">{student.email}</p>
-                    <p className="text-xs text-gray-600 mt-1">LRN: {student.lrn}</p>
-                    <p className="text-xs text-gray-600">Grade {student.grade}</p>
-                  </div>
-                </div>
 
-                <div className="mt-3 flex items-center gap-2 flex-wrap">
-                  <button
-                    onClick={() => handleViewStudent(student)}
-                    className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                    title="View Details"
-                  >
-                    <Eye className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleEditStudent(student)}
-                    className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                    title="Edit"
-                  >
-                    <Edit className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => sendFamilyAlert(student)}
-                    className="p-2 text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
-                    title="Send Family Alert"
-                  >
-                    <Mail className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteClick(student.id)}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    title="Delete"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="mt-3 flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={() => handleViewStudent(student)}
+                      className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                      title="View Details"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleEditStudent(student)}
+                      className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                      title="Edit"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => sendFamilyAlert(student)}
+                      className="p-2 text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
+                      title="Send Family Alert"
+                    >
+                      <Mail className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteClick(student.id)}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))
+              )
+            })
           )}
         </div>
 
@@ -804,81 +886,84 @@ export default function StudentsPage() {
                   </td>
                 </tr>
               ) : (
-                paginatedStudents.map((student) => (
-                  <tr key={student.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-3 sm:px-6 py-3 sm:py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-full bg-linear-to-br from-indigo-100 to-purple-100 flex items-center justify-center shadow-sm border-2 border-white shrink-0">
-                          {student.profile_photo_base64 || student.profile_photo_url ? (
-                            <img 
-                              src={student.profile_photo_base64 || student.profile_photo_url || ''} 
-                              alt={student.full_name}
-                              className="w-12 h-12 rounded-full object-cover"
-                            />
-                          ) : (
-                            <User className="w-6 h-6 text-indigo-600" />
-                          )}
+                paginatedStudents.map((student) => {
+                  const displayName = formatStudentName(student.first_name, student.middle_name, student.last_name)
+                  return (
+                    <tr key={student.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-3 sm:px-6 py-3 sm:py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-full bg-linear-to-br from-indigo-100 to-purple-100 flex items-center justify-center shadow-sm border-2 border-white shrink-0">
+                            {student.profile_photo_base64 || student.profile_photo_url ? (
+                              <img 
+                                src={student.profile_photo_base64 || student.profile_photo_url || ''} 
+                                alt={displayName}
+                                className="w-12 h-12 rounded-full object-cover"
+                              />
+                            ) : (
+                              <User className="w-6 h-6 text-indigo-600" />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-gray-900 truncate">{displayName}</p>
+                            <p className="text-sm text-gray-500 flex items-center gap-1 mt-0.5 max-w-42.5 sm:max-w-60 truncate">
+                              <Mail className="w-3.5 h-3.5 shrink-0" />
+                              {student.email}
+                            </p>
+                          </div>
                         </div>
-                        <div className="min-w-0">
-                          <p className="font-semibold text-gray-900 truncate">{student.full_name}</p>
-                          <p className="text-sm text-gray-500 flex items-center gap-1 mt-0.5 max-w-42.5 sm:max-w-60 truncate">
-                            <Mail className="w-3.5 h-3.5 shrink-0" />
-                            {student.email}
-                          </p>
+                      </td>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4">
+                        <span className="font-mono text-sm bg-gray-100 px-3 py-1.5 rounded-lg">
+                          {student.lrn}
+                        </span>
+                      </td>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 hidden sm:table-cell">
+                        <span className="px-3 py-1.5 bg-indigo-100 text-indigo-700 rounded-lg text-sm font-medium inline-flex items-center gap-1">
+                          <GraduationCap className="w-3.5 h-3.5 shrink-0" />
+                          Grade {student.grade}
+                        </span>
+                      </td>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 hidden md:table-cell">
+                        <p className="text-sm flex items-center gap-1">
+                          <Phone className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                          {student.contact_number}
+                        </p>
+                      </td>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4">
+                        <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
+                          <button
+                            onClick={() => handleViewStudent(student)}
+                            className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                            title="View Details"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleEditStudent(student)}
+                            className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                            title="Edit"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => sendFamilyAlert(student)}
+                            className="p-2 text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
+                            title="Send Family Alert"
+                          >
+                            <Mail className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteClick(student.id)}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-3 sm:px-6 py-3 sm:py-4">
-                      <span className="font-mono text-sm bg-gray-100 px-3 py-1.5 rounded-lg">
-                        {student.lrn}
-                      </span>
-                    </td>
-                    <td className="px-3 sm:px-6 py-3 sm:py-4 hidden sm:table-cell">
-                      <span className="px-3 py-1.5 bg-indigo-100 text-indigo-700 rounded-lg text-sm font-medium inline-flex items-center gap-1">
-                        <GraduationCap className="w-3.5 h-3.5 shrink-0" />
-                        Grade {student.grade}
-                      </span>
-                    </td>
-                    <td className="px-3 sm:px-6 py-3 sm:py-4 hidden md:table-cell">
-                      <p className="text-sm flex items-center gap-1">
-                        <Phone className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                        {student.contact_number}
-                      </p>
-                    </td>
-                    <td className="px-3 sm:px-6 py-3 sm:py-4">
-                      <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
-                        <button
-                          onClick={() => handleViewStudent(student)}
-                          className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                          title="View Details"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleEditStudent(student)}
-                          className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                          title="Edit"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => sendFamilyAlert(student)}
-                          className="p-2 text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
-                          title="Send Family Alert"
-                        >
-                          <Mail className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteClick(student.id)}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                    </tr>
+                  )
+                })
               )}
             </tbody>
           </table>
@@ -941,11 +1026,12 @@ export default function StudentsPage() {
         )}
       </div>
 
-      {/* Student Details/Edit Modal */}
+      {/* Student Details/Edit Modal - Enhanced */}
       {showStudentModal && selectedStudent && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl sm:rounded-2xl max-w-4xl w-full max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-4rem)] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-4 sm:px-6 py-4 flex items-center justify-between">
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-4 sm:px-6 py-4 flex items-center justify-between z-10">
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setShowStudentModal(false)}
@@ -956,6 +1042,12 @@ export default function StudentsPage() {
                 <h2 className="text-lg sm:text-xl font-bold text-gray-800">
                   {isEditing ? 'Edit Student' : 'Student Details'}
                 </h2>
+                {!isEditing && selectedStudent.is_active && (
+                  <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium flex items-center gap-1">
+                    <BadgeCheck className="w-3 h-3" />
+                    Active
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 {!isEditing ? (
@@ -995,7 +1087,7 @@ export default function StudentsPage() {
                 </div>
               )}
 
-              {/* Profile Header */}
+              {/* Profile Header - Enhanced */}
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 pb-6 border-b border-gray-200">
                 <div className="relative group">
                   <div className="absolute inset-0 rounded-full bg-linear-to-r from-indigo-500 to-purple-600 blur-xl opacity-60 group-hover:opacity-80 transition-opacity"></div>
@@ -1047,123 +1139,167 @@ export default function StudentsPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="text-xl sm:text-2xl font-bold text-gray-900 wrap-break-word">
-                    {isEditing ? editedStudent.full_name || selectedStudent.full_name : selectedStudent.full_name}
+                    {isEditing ? formatStudentName(editedStudent.first_name || '', editedStudent.middle_name || '', editedStudent.last_name || '') : selectedStudent.full_name}
                   </h3>
-                  <p className="text-gray-600 flex items-center gap-2 mt-1 flex-wrap">
-                    <span className="font-mono bg-gray-100 px-3 py-1 rounded-lg text-xs sm:text-sm">
+                  <div className="flex flex-wrap items-center gap-2 mt-2">
+                    <span className="font-mono text-xs sm:text-sm bg-gray-100 px-3 py-1 rounded-lg">
                       LRN: {selectedStudent.lrn}
                     </span>
-                  </p>
-                  <div className="flex items-center gap-2 mt-2">
                     <span className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-lg text-sm font-medium inline-flex items-center gap-1">
                       <GraduationCap className="w-3.5 h-3.5 shrink-0" />
                       Grade {selectedStudent.grade}
                     </span>
+                    {selectedStudent.section && (
+                      <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-lg text-sm font-medium">
+                        {selectedStudent.section}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
 
               {!isEditing ? (
-                /* View Mode */
+                /* View Mode - Enhanced */
                 <div className="space-y-6">
-                  {/* Personal Information */}
-                  <div>
-                    <h4 className="text-lg font-semibold text-gray-800 pb-2 border-b border-gray-200 flex items-center gap-2">
-                      <User className="w-5 h-5 text-indigo-600 shrink-0" />
+                  {/* Personal Information Card */}
+                  <div className="bg-gray-50 rounded-xl p-5">
+                    <h4 className="text-lg font-semibold text-gray-800 pb-3 border-b border-gray-200 flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
+                        <User className="w-4 h-4 text-indigo-600" />
+                      </div>
                       Personal Information
                     </h4>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mt-4">
                       <div>
-                        <p className="text-xs font-medium text-gray-500 uppercase">Full Name</p>
-                        <p className="text-base font-semibold text-gray-900 mt-1">{selectedStudent.full_name}</p>
+                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">First Name</p>
+                        <p className="text-base font-semibold text-gray-900 mt-1">{selectedStudent.first_name}</p>
                       </div>
                       <div>
-                        <p className="text-xs font-medium text-gray-500 uppercase">Email</p>
-                        <p className="text-base text-gray-900 mt-1">{selectedStudent.email}</p>
+                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Middle Name</p>
+                        <p className="text-base text-gray-900 mt-1">{selectedStudent.middle_name || '—'}</p>
                       </div>
                       <div>
-                        <p className="text-xs font-medium text-gray-500 uppercase">Contact Number</p>
-                        <p className="text-base font-semibold text-gray-900 mt-1">{selectedStudent.contact_number}</p>
+                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Last Name</p>
+                        <p className="text-base font-semibold text-gray-900 mt-1">{selectedStudent.last_name}</p>
                       </div>
                       <div>
-                        <p className="text-xs font-medium text-gray-500 uppercase">Date of Birth</p>
-                        <p className="text-base text-gray-900 mt-1">
-                          {new Date(selectedStudent.date_of_birth).toLocaleDateString('en-US', {
-                            month: 'long',
-                            day: 'numeric',
-                            year: 'numeric'
-                          })}
-                        </p>
+                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Email</p>
+                        <div className="flex items-center gap-1 mt-1">
+                          <Mail className="w-3.5 h-3.5 text-gray-400" />
+                          <p className="text-base text-gray-900">{selectedStudent.email}</p>
+                        </div>
                       </div>
                       <div>
-                        <p className="text-xs font-medium text-gray-500 uppercase">Sex</p>
-                        <p className="text-base text-gray-900 mt-1">{selectedStudent.sex || 'Not specified'}</p>
+                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Contact Number</p>
+                        <div className="flex items-center gap-1 mt-1">
+                          <Phone className="w-3.5 h-3.5 text-gray-400" />
+                          <p className="text-base font-semibold text-gray-900">{selectedStudent.contact_number}</p>
+                        </div>
                       </div>
-                      <div className="md:col-span-2">
-                        <p className="text-xs font-medium text-gray-500 uppercase">Address</p>
-                        <p className="text-base text-gray-900 mt-1">{selectedStudent.address}</p>
+                      <div>
+                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Date of Birth</p>
+                        <div className="flex items-center gap-1 mt-1">
+                          <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                          <p className="text-base text-gray-900">
+                            {selectedStudent.date_of_birth ? new Date(selectedStudent.date_of_birth).toLocaleDateString('en-US', {
+                              month: 'long',
+                              day: 'numeric',
+                              year: 'numeric'
+                            }) : '—'}
+                          </p>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Sex</p>
+                        <div className="flex items-center gap-1 mt-1">
+                          <VenusAndMars className="w-3.5 h-3.5 text-gray-400" />
+                          <p className="text-base text-gray-900">{selectedStudent.sex || '—'}</p>
+                        </div>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Address</p>
+                        <div className="flex items-start gap-1 mt-1">
+                          <MapPin className="w-3.5 h-3.5 text-gray-400 mt-0.5 shrink-0" />
+                          <p className="text-base text-gray-900">{selectedStudent.address}</p>
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Academic Information */}
-                  <div>
-                    <h4 className="text-lg font-semibold text-gray-800 pb-2 border-b border-gray-200 flex items-center gap-2">
-                      <GraduationCap className="w-5 h-5 text-green-600 shrink-0" />
+                  {/* Academic Information Card */}
+                  <div className="bg-gray-50 rounded-xl p-5">
+                    <h4 className="text-lg font-semibold text-gray-800 pb-3 border-b border-gray-200 flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
+                        <GraduationCap className="w-4 h-4 text-green-600" />
+                      </div>
                       Academic Information
                     </h4>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mt-4">
-                      <div>
-                        <p className="text-xs font-medium text-gray-500 uppercase">Previous Elementary</p>
-                        <p className="text-base text-gray-900 mt-1">{selectedStudent.previous_elementary || 'N/A'}</p>
+                      <div className="sm:col-span-2">
+                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Previous Elementary School</p>
+                        <div className="flex items-center gap-1 mt-1">
+                          <School className="w-3.5 h-3.5 text-gray-400" />
+                          <p className="text-base text-gray-900">{selectedStudent.previous_elementary || '—'}</p>
+                        </div>
                       </div>
                       {selectedStudent.previous_high_school && (
-                        <div>
-                          <p className="text-xs font-medium text-gray-500 uppercase">Previous High School</p>
+                        <div className="sm:col-span-2">
+                          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Previous High School</p>
                           <p className="text-base text-gray-900 mt-1">{selectedStudent.previous_high_school}</p>
                         </div>
                       )}
                       {selectedStudent.previous_shs && (
-                        <div>
-                          <p className="text-xs font-medium text-gray-500 uppercase">Previous Senior High School</p>
+                        <div className="sm:col-span-2">
+                          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Previous Senior High School</p>
                           <p className="text-base text-gray-900 mt-1">{selectedStudent.previous_shs}</p>
                         </div>
                       )}
                     </div>
                   </div>
 
-                  {/* Parents & Guardian */}
+                  {/* Parents & Guardian Card */}
                   {(selectedStudent.father_name || selectedStudent.mother_name || selectedStudent.guardian_name) && (
-                    <div>
-                      <h4 className="text-lg font-semibold text-gray-800 pb-2 border-b border-gray-200 flex items-center gap-2">
-                        <Users className="w-5 h-5 text-amber-600 shrink-0" />
+                    <div className="bg-gray-50 rounded-xl p-5">
+                      <h4 className="text-lg font-semibold text-gray-800 pb-3 border-b border-gray-200 flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
+                          <Users className="w-4 h-4 text-amber-600" />
+                        </div>
                         Parents & Guardian
                       </h4>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mt-4">
                         {selectedStudent.father_name && (
                           <div>
-                            <p className="text-xs font-medium text-gray-500 uppercase">Father's Name</p>
+                            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Father's Name</p>
                             <p className="text-base font-semibold text-gray-900 mt-1">{selectedStudent.father_name}</p>
                             {selectedStudent.father_occupation && (
-                              <p className="text-sm text-gray-600 mt-1">{selectedStudent.father_occupation}</p>
+                              <div className="flex items-center gap-1 mt-1">
+                                <Briefcase className="w-3.5 h-3.5 text-gray-400" />
+                                <p className="text-sm text-gray-600">{selectedStudent.father_occupation}</p>
+                              </div>
                             )}
                           </div>
                         )}
                         {selectedStudent.mother_name && (
                           <div>
-                            <p className="text-xs font-medium text-gray-500 uppercase">Mother's Name</p>
+                            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Mother's Name</p>
                             <p className="text-base font-semibold text-gray-900 mt-1">{selectedStudent.mother_name}</p>
                             {selectedStudent.mother_occupation && (
-                              <p className="text-sm text-gray-600 mt-1">{selectedStudent.mother_occupation}</p>
+                              <div className="flex items-center gap-1 mt-1">
+                                <Briefcase className="w-3.5 h-3.5 text-gray-400" />
+                                <p className="text-sm text-gray-600">{selectedStudent.mother_occupation}</p>
+                              </div>
                             )}
                           </div>
                         )}
                         {selectedStudent.guardian_name && (
-                          <div className="md:col-span-2">
-                            <p className="text-xs font-medium text-gray-500 uppercase">Guardian's Name</p>
+                          <div className={selectedStudent.father_name && selectedStudent.mother_name ? "sm:col-span-2" : ""}>
+                            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Guardian's Name</p>
                             <p className="text-base font-semibold text-gray-900 mt-1">{selectedStudent.guardian_name}</p>
                             {selectedStudent.guardian_contact && (
-                              <p className="text-sm text-gray-600 mt-1">{selectedStudent.guardian_contact}</p>
+                              <div className="flex items-center gap-1 mt-1">
+                                <Phone className="w-3.5 h-3.5 text-gray-400" />
+                                <p className="text-sm text-gray-600">{selectedStudent.guardian_contact}</p>
+                              </div>
                             )}
                           </div>
                         )}
@@ -1171,61 +1307,79 @@ export default function StudentsPage() {
                     </div>
                   )}
 
-                  {/* Medical Information */}
+                  {/* Medical Information Card */}
                   {(selectedStudent.medical_conditions || selectedStudent.medications || selectedStudent.allergies) && (
-                    <div>
-                      <h4 className="text-lg font-semibold text-gray-800 pb-2 border-b border-gray-200 flex items-center gap-2">
-                        <Heart className="w-5 h-5 text-rose-600 shrink-0" />
+                    <div className="bg-gray-50 rounded-xl p-5">
+                      <h4 className="text-lg font-semibold text-gray-800 pb-3 border-b border-gray-200 flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-rose-100 flex items-center justify-center">
+                          <Heart className="w-4 h-4 text-rose-600" />
+                        </div>
                         Medical Information
                       </h4>
                       <div className="grid gap-4 mt-4">
                         {selectedStudent.medical_conditions && (
                           <div>
-                            <p className="text-xs font-medium text-gray-500 uppercase">Medical Conditions</p>
-                            <p className="text-base text-gray-900 mt-1">{selectedStudent.medical_conditions}</p>
+                            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Medical Conditions</p>
+                            <div className="flex items-start gap-1 mt-1">
+                              <AlertCircle className="w-3.5 h-3.5 text-gray-400 mt-0.5 shrink-0" />
+                              <p className="text-base text-gray-900">{selectedStudent.medical_conditions}</p>
+                            </div>
                           </div>
                         )}
                         {selectedStudent.medications && (
                           <div>
-                            <p className="text-xs font-medium text-gray-500 uppercase">Medications</p>
-                            <p className="text-base text-gray-900 mt-1">{selectedStudent.medications}</p>
+                            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Medications</p>
+                            <div className="flex items-start gap-1 mt-1">
+                              <Pill className="w-3.5 h-3.5 text-gray-400 mt-0.5 shrink-0" />
+                              <p className="text-base text-gray-900">{selectedStudent.medications}</p>
+                            </div>
                           </div>
                         )}
                         {selectedStudent.allergies && (
                           <div>
-                            <p className="text-xs font-medium text-gray-500 uppercase">Allergies</p>
-                            <p className="text-base text-gray-900 mt-1">{selectedStudent.allergies}</p>
+                            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Allergies</p>
+                            <div className="flex items-start gap-1 mt-1">
+                              <AlertTriangle className="w-3.5 h-3.5 text-gray-400 mt-0.5 shrink-0" />
+                              <p className="text-base text-gray-900">{selectedStudent.allergies}</p>
+                            </div>
                           </div>
                         )}
                       </div>
                     </div>
                   )}
 
-                  {/* Emergency Contact */}
-                  <div>
-                    <h4 className="text-lg font-semibold text-gray-800 pb-2 border-b border-gray-200 flex items-center gap-2">
-                      <Phone className="w-5 h-5 text-rose-600 shrink-0" />
-                      Emergency Contact
-                    </h4>
-                    <div className="mt-4">
-                      <p className="text-xs font-medium text-gray-500 uppercase">Emergency Contact Number</p>
-                      <p className="text-base font-semibold text-gray-900 mt-1">{selectedStudent.emergency_contact}</p>
+                  {/* Emergency Contact Card */}
+                  {selectedStudent.emergency_contact && (
+                    <div className="bg-gray-50 rounded-xl p-5">
+                      <h4 className="text-lg font-semibold text-gray-800 pb-3 border-b border-gray-200 flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center">
+                          <Phone className="w-4 h-4 text-red-600" />
+                        </div>
+                        Emergency Contact
+                      </h4>
+                      <div className="mt-4">
+                        <p className="text-base font-semibold text-gray-900">{selectedStudent.emergency_contact}</p>
+                      </div>
                     </div>
-                  </div>
+                  )}
 
-                  {/* QR Code */}
+                  {/* QR Code Card */}
                   {selectedStudent.qr_code_data && (
-                    <div>
-                      <h4 className="text-lg font-semibold text-gray-800 pb-2 border-b border-gray-200 flex items-center gap-2">
-                        <QrCode className="w-5 h-5 text-indigo-600 shrink-0" />
+                    <div className="bg-gray-50 rounded-xl p-5">
+                      <h4 className="text-lg font-semibold text-gray-800 pb-3 border-b border-gray-200 flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
+                          <QrCode className="w-4 h-4 text-purple-600" />
+                        </div>
                         QR Code
                       </h4>
                       <div className="mt-4 flex justify-center">
-                        <img 
-                          src={selectedStudent.qr_code_data} 
-                          alt="Student QR Code"
-                          className="w-48 h-48 border border-gray-200 rounded-lg p-2"
-                        />
+                        <div className="bg-white p-4 rounded-xl shadow-sm">
+                          <img 
+                            src={selectedStudent.qr_code_data} 
+                            alt="Student QR Code"
+                            className="w-48 h-48"
+                          />
+                        </div>
                       </div>
                     </div>
                   )}
@@ -1275,7 +1429,7 @@ export default function StudentsPage() {
                             value={editedStudent.first_name || ''}
                             onChange={(e) => handleInputChange('first_name', e.target.value)}
                             className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
-                            placeholder="Enter first name"
+                            placeholder="Enter first name (e.g., Mark Joheun)"
                           />
                         </div>
 
@@ -1288,7 +1442,7 @@ export default function StudentsPage() {
                             value={editedStudent.middle_name || ''}
                             onChange={(e) => handleInputChange('middle_name', e.target.value)}
                             className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
-                            placeholder="Enter middle name"
+                            placeholder="Enter middle name (optional)"
                           />
                         </div>
 
@@ -1389,9 +1543,8 @@ export default function StudentsPage() {
                               className="w-full pl-11 pr-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all appearance-none"
                             >
                               <option value="">Select grade</option>
-                              {[11,12].map(grade => (
-                                <option key={grade} value={grade}>Grade {grade}</option>
-                              ))}
+                              <option value="11">Grade 11</option>
+                              <option value="12">Grade 12</option>
                             </select>
                           </div>
                         </div>
