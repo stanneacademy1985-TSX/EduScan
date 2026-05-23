@@ -47,9 +47,7 @@ interface Student {
 
 interface Teacher {
   id: string
-  first_name: string
-  middle_name: string
-  last_name: string
+  full_name: string
   assigned_grade: string
 }
 
@@ -68,38 +66,36 @@ const capitalizeName = (name: string): string => {
     .join(' ')
 }
 
-// Format full name for display: "First M. Last" or "First Last" if no middle name
-const formatFullName = (firstName: string, middleName: string, lastName: string): string => {
-  const first = capitalizeName(firstName)
-  const last = capitalizeName(lastName)
+// Format student full name for display: "First M. Last" or "First Last" if no middle name
+const formatStudentName = (firstName: string, middleName: string, lastName: string): string => {
+  const first = capitalizeName(firstName || '')
+  const last = capitalizeName(lastName || '')
   
-  if (middleName && middleName.trim()) {
-    // Get first letter of middle name for initial
-    const middleInitial = middleName.trim().charAt(0).toUpperCase()
-    return `${first} ${middleInitial}. ${last}`
-  }
-  return `${first} ${last}`
-}
-
-// Format teacher name for display
-const formatTeacherName = (firstName: string, middleName: string, lastName: string): string => {
-  const first = capitalizeName(firstName)
-  const last = capitalizeName(lastName)
+  if (!first && !last) return 'Unknown Student'
   
   if (middleName && middleName.trim()) {
     const middleInitial = middleName.trim().charAt(0).toUpperCase()
     return `${first} ${middleInitial}. ${last}`
   }
-  return `${first} ${last}`
+  return `${first} ${last}`.trim()
 }
 
-// Get full name string for storage/display
-const getFullNameString = (firstName: string, middleName: string, lastName: string): string => {
-  const parts = []
-  if (firstName) parts.push(capitalizeName(firstName))
-  if (middleName) parts.push(capitalizeName(middleName))
-  if (lastName) parts.push(capitalizeName(lastName))
-  return parts.join(' ')
+// Format teacher name from full_name field
+const formatTeacherName = (fullName: string): string => {
+  if (!fullName) return 'Unknown Teacher'
+  
+  const nameParts = fullName.trim().split(/\s+/)
+  if (nameParts.length === 1) {
+    return capitalizeName(nameParts[0])
+  } else if (nameParts.length === 2) {
+    return `${capitalizeName(nameParts[0])} ${capitalizeName(nameParts[1])}`
+  } else if (nameParts.length >= 3) {
+    const firstName = capitalizeName(nameParts[0])
+    const middleInitial = nameParts[1].charAt(0).toUpperCase()
+    const lastName = capitalizeName(nameParts[nameParts.length - 1])
+    return `${firstName} ${middleInitial}. ${lastName}`
+  }
+  return capitalizeName(fullName)
 }
 
 export default function SuperAdminStudentsPage() {
@@ -161,21 +157,14 @@ export default function SuperAdminStudentsPage() {
 
       if (studentsError) throw studentsError
 
-      // Fetch all teachers with separate name fields
+      // Fetch all teachers (they use full_name in admin_users table)
       const { data: teachersData, error: teachersError } = await supabase
         .from('admin_users')
-        .select('id, first_name, middle_name, last_name, assigned_grade')
+        .select('id, full_name, assigned_grade')
         .in('role', ['admin', 'teacher'])
 
       if (teachersError) throw teachersError
-      
-      const formattedTeachers = (teachersData || []).map((teacher: any) => ({
-        ...teacher,
-        first_name: teacher.first_name || '',
-        middle_name: teacher.middle_name || '',
-        last_name: teacher.last_name || ''
-      }))
-      setTeachers(formattedTeachers)
+      setTeachers(teachersData || [])
 
       // Fetch student-teacher assignments
       const { data: assignments, error: assignmentsError } = await supabase
@@ -192,7 +181,7 @@ export default function SuperAdminStudentsPage() {
       // Combine data
       const studentsWithAssignment = (studentsData || []).map((student: any) => {
         const teacherId = assignmentMap.get(student.id)
-        const teacher = formattedTeachers.find(t => t.id === teacherId)
+        const teacher = teachersData?.find(t => t.id === teacherId)
         
         return {
           ...student,
@@ -201,7 +190,7 @@ export default function SuperAdminStudentsPage() {
           last_name: student.last_name || '',
           is_assigned: !!teacherId,
           teacher_id: teacherId,
-          teacher_name: teacher ? formatTeacherName(teacher.first_name, teacher.middle_name, teacher.last_name) : undefined
+          teacher_name: teacher ? formatTeacherName(teacher.full_name) : undefined
         }
       })
 
@@ -370,10 +359,10 @@ export default function SuperAdminStudentsPage() {
   }
 
   const handleExportCSV = () => {
-    const headers = ['LRN', 'First Name', 'Middle Name', 'Last Name', 'Full Name', 'Email', 'Grade', 'Contact', 'Assigned Teacher', 'Status']
+    const headers = ['LRN', 'First Name', 'Middle Name', 'Last Name', 'Full Name', 'Email', 'Grade', 'Section', 'Contact', 'Assigned Teacher', 'Status']
     
     const csvData = filteredStudents.map(student => {
-      const fullName = formatFullName(student.first_name, student.middle_name, student.last_name)
+      const fullName = formatStudentName(student.first_name, student.middle_name, student.last_name)
       return [
         `="${student.lrn}"`,
         student.first_name,
@@ -382,6 +371,7 @@ export default function SuperAdminStudentsPage() {
         fullName,
         student.email,
         student.grade,
+        student.section || '',
         student.contact_number,
         student.teacher_name || 'Unassigned',
         student.is_assigned ? 'Assigned' : 'Unassigned'
@@ -542,7 +532,7 @@ export default function SuperAdminStudentsPage() {
             <option value="all">All Teachers</option>
             {teachers.map(teacher => (
               <option key={teacher.id} value={teacher.id}>
-                {formatTeacherName(teacher.first_name, teacher.middle_name, teacher.last_name)}
+                {formatTeacherName(teacher.full_name)}
                 {teacher.assigned_grade && ` (Grade ${teacher.assigned_grade})`}
               </option>
             ))}
@@ -604,7 +594,7 @@ export default function SuperAdminStudentsPage() {
                       LRN
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      Grade
+                      Grade & Section
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                       Contact
@@ -622,7 +612,7 @@ export default function SuperAdminStudentsPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {paginatedStudents.map((student) => {
-                    const displayName = formatFullName(student.first_name, student.middle_name, student.last_name)
+                    const displayName = formatStudentName(student.first_name, student.middle_name, student.last_name)
                     return (
                       <tr key={student.id} className="hover:bg-gray-50 transition-colors">
                         <td className="px-6 py-4">
@@ -650,11 +640,18 @@ export default function SuperAdminStudentsPage() {
                           </span>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="flex items-center gap-1">
-                            <GraduationCap className="w-4 h-4 text-gray-400" />
-                            <span className="text-sm">
-                              Grade {student.grade}
-                            </span>
+                          <div className="flex flex-col">
+                            <div className="flex items-center gap-1">
+                              <GraduationCap className="w-4 h-4 text-gray-400" />
+                              <span className="text-sm font-medium">
+                                Grade {student.grade}
+                              </span>
+                            </div>
+                            {student.section && (
+                              <span className="text-xs text-gray-500 mt-0.5">
+                                Section: {student.section}
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td className="px-6 py-4">
@@ -777,7 +774,7 @@ export default function SuperAdminStudentsPage() {
             <div className="p-6 border-b border-gray-200">
               <h2 className="text-xl font-bold text-gray-800">Assign Student to Teacher</h2>
               <p className="text-sm text-gray-500 mt-1">
-                {formatFullName(selectedStudent.first_name, selectedStudent.middle_name, selectedStudent.last_name)} (Grade {selectedStudent.grade})
+                {formatStudentName(selectedStudent.first_name, selectedStudent.middle_name, selectedStudent.last_name)} (Grade {selectedStudent.grade})
               </p>
             </div>
 
@@ -794,7 +791,7 @@ export default function SuperAdminStudentsPage() {
                   <option value="">Choose a teacher...</option>
                   {teachers.map(teacher => (
                     <option key={teacher.id} value={teacher.id}>
-                      {formatTeacherName(teacher.first_name, teacher.middle_name, teacher.last_name)}
+                      {formatTeacherName(teacher.full_name)}
                       {teacher.assigned_grade && ` (Grade ${teacher.assigned_grade})`}
                     </option>
                   ))}
@@ -966,7 +963,7 @@ export default function SuperAdminStudentsPage() {
               </div>
               <h3 className="text-xl font-bold text-gray-800 mb-2">Delete Student</h3>
               <p className="text-gray-600 mb-6">
-                Are you sure you want to delete {formatFullName(studentToDelete.first_name, studentToDelete.middle_name, studentToDelete.last_name)}? This action cannot be undone.
+                Are you sure you want to delete {formatStudentName(studentToDelete.first_name, studentToDelete.middle_name, studentToDelete.last_name)}? This action cannot be undone.
               </p>
               <div className="flex flex-col sm:flex-row gap-3">
                 <button
