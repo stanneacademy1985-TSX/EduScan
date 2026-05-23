@@ -57,6 +57,58 @@ interface StudentTeacherAssignment {
 
 type StudentRow = Omit<Student, 'is_assigned' | 'teacher_name'>
 
+// Helper function to format name with proper capitalization and middle initial
+const formatFullName = (fullName: string): string => {
+  if (!fullName) return ''
+  
+  const nameParts = fullName.trim().split(/\s+/)
+  
+  if (nameParts.length === 1) {
+    // Only first name
+    return capitalizeName(nameParts[0])
+  } else if (nameParts.length === 2) {
+    // First and Last name only
+    return `${capitalizeName(nameParts[0])} ${capitalizeName(nameParts[1])}`
+  } else if (nameParts.length >= 3) {
+    // First, Middle, Last name - format as "First M. Last"
+    const firstName = capitalizeName(nameParts[0])
+    const middleInitial = nameParts[1].charAt(0).toUpperCase()
+    const lastName = capitalizeName(nameParts[nameParts.length - 1])
+    return `${firstName} ${middleInitial}. ${lastName}`
+  }
+  
+  return capitalizeName(fullName)
+}
+
+// Helper function to capitalize first letter of each word
+const capitalizeName = (name: string): string => {
+  if (!name) return name
+  return name
+    .toLowerCase()
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+}
+
+// Helper function to format name for editing (store full name properly)
+const formatNameForStorage = (firstName: string, middleName: string, lastName: string): string => {
+  const parts = []
+  if (firstName) parts.push(capitalizeName(firstName))
+  if (middleName) parts.push(capitalizeName(middleName))
+  if (lastName) parts.push(capitalizeName(lastName))
+  return parts.join(' ')
+}
+
+// Helper to parse full name into parts
+const parseFullName = (fullName: string) => {
+  const parts = fullName.trim().split(/\s+/)
+  return {
+    firstName: parts[0] || '',
+    middleName: parts.length > 2 ? parts.slice(1, -1).join(' ') : '',
+    lastName: parts.length > 1 ? parts[parts.length - 1] : ''
+  }
+}
+
 export default function SuperAdminStudentsPage() {
   const router = useRouter()
   const [students, setStudents] = useState<Student[]>([])
@@ -84,6 +136,11 @@ export default function SuperAdminStudentsPage() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [studentToDelete, setStudentToDelete] = useState<Student | null>(null)
+
+  // Edit form state
+  const [editFirstName, setEditFirstName] = useState('')
+  const [editMiddleName, setEditMiddleName] = useState('')
+  const [editLastName, setEditLastName] = useState('')
 
   const itemsPerPage = 10
 
@@ -141,14 +198,15 @@ export default function SuperAdminStudentsPage() {
       // Create teacher name map
       const teacherNameMap = new Map()
       teachersData?.forEach((teacher: Teacher) => {
-        teacherNameMap.set(teacher.id, teacher.full_name)
+        teacherNameMap.set(teacher.id, formatFullName(teacher.full_name))
       })
 
-      // Combine data
+      // Combine data with formatted names
       const studentsWithAssignment = (studentsData || []).map((student: StudentRow) => {
         const teacherId = assignmentMap.get(student.id)
         return {
           ...student,
+          full_name: formatFullName(student.full_name),
           is_assigned: !!teacherId,
           teacher_id: teacherId,
           teacher_name: teacherId ? teacherNameMap.get(teacherId) : undefined
@@ -225,6 +283,10 @@ export default function SuperAdminStudentsPage() {
 
   const handleEditClick = (student: Student) => {
     setSelectedStudent(student)
+    const { firstName, middleName, lastName } = parseFullName(student.full_name)
+    setEditFirstName(firstName)
+    setEditMiddleName(middleName)
+    setEditLastName(lastName)
     setEditedStudent(student)
     setShowEditModal(true)
     setOpenActionMenuId(null)
@@ -233,12 +295,15 @@ export default function SuperAdminStudentsPage() {
   const handleEditSave = async () => {
     if (!selectedStudent) return
 
+    // Format the full name with proper capitalization
+    const formattedFullName = formatNameForStorage(editFirstName, editMiddleName, editLastName)
+
     setSavingStudent(true)
     try {
       const { error } = await supabase
         .from('students')
         .update({
-          full_name: editedStudent.full_name,
+          full_name: formattedFullName,
           email: editedStudent.email,
           contact_number: editedStudent.contact_number,
           grade: editedStudent.grade,
@@ -248,14 +313,17 @@ export default function SuperAdminStudentsPage() {
 
       if (error) throw error
 
+      // Format the name for display
+      const formattedDisplayName = formatFullName(formattedFullName)
+
       setStudents(prev => prev.map(student => (
         student.id === selectedStudent.id
-          ? { ...student, ...editedStudent } as Student
+          ? { ...student, ...editedStudent, full_name: formattedDisplayName } as Student
           : student
       )))
       setFilteredStudents(prev => prev.map(student => (
         student.id === selectedStudent.id
-          ? { ...student, ...editedStudent } as Student
+          ? { ...student, ...editedStudent, full_name: formattedDisplayName } as Student
           : student
       )))
 
@@ -494,7 +562,7 @@ export default function SuperAdminStudentsPage() {
             <option value="all">All Teachers</option>
             {teachers.map(teacher => (
               <option key={teacher.id} value={teacher.id}>
-                {teacher.full_name}
+                {formatFullName(teacher.full_name)}
                 {teacher.assigned_grade && ` (Grade ${teacher.assigned_grade})`}
               </option>
             ))}
@@ -677,8 +745,8 @@ export default function SuperAdminStudentsPage() {
                             )}
                           </div>
                         </div>
-                      </td>
-                    </tr>
+                       </td>
+                    </table>
                   ))}
                 </tbody>
               </table>
@@ -746,7 +814,7 @@ export default function SuperAdminStudentsPage() {
                   <option value="">Choose a teacher...</option>
                   {teachers.map(teacher => (
                     <option key={teacher.id} value={teacher.id}>
-                      {teacher.full_name}
+                      {formatFullName(teacher.full_name)}
                       {teacher.assigned_grade && ` (Grade ${teacher.assigned_grade})`}
                     </option>
                   ))}
@@ -828,27 +896,66 @@ export default function SuperAdminStudentsPage() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <label className="block text-sm">
-                <span className="text-gray-700 font-medium">Full Name</span>
-                <input value={editedStudent.full_name || ''} onChange={(e) => setEditedStudent(prev => ({ ...prev, full_name: e.target.value }))} className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg" />
+                <span className="text-gray-700 font-medium">First Name</span>
+                <input 
+                  value={editFirstName} 
+                  onChange={(e) => setEditFirstName(e.target.value)} 
+                  className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg" 
+                  placeholder="First Name"
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="text-gray-700 font-medium">Middle Name</span>
+                <input 
+                  value={editMiddleName} 
+                  onChange={(e) => setEditMiddleName(e.target.value)} 
+                  className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg" 
+                  placeholder="Middle Name"
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="text-gray-700 font-medium">Last Name</span>
+                <input 
+                  value={editLastName} 
+                  onChange={(e) => setEditLastName(e.target.value)} 
+                  className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg" 
+                  placeholder="Last Name"
+                />
               </label>
               <label className="block text-sm">
                 <span className="text-gray-700 font-medium">Email</span>
-                <input value={editedStudent.email || ''} onChange={(e) => setEditedStudent(prev => ({ ...prev, email: e.target.value }))} className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg" />
+                <input 
+                  value={editedStudent.email || ''} 
+                  onChange={(e) => setEditedStudent(prev => ({ ...prev, email: e.target.value }))} 
+                  className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg" 
+                />
               </label>
               <label className="block text-sm">
                 <span className="text-gray-700 font-medium">Contact Number</span>
-                <input value={editedStudent.contact_number || ''} onChange={(e) => setEditedStudent(prev => ({ ...prev, contact_number: e.target.value }))} className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg" />
+                <input 
+                  value={editedStudent.contact_number || ''} 
+                  onChange={(e) => setEditedStudent(prev => ({ ...prev, contact_number: e.target.value }))} 
+                  className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg" 
+                />
               </label>
               <label className="block text-sm">
                 <span className="text-gray-700 font-medium">Grade</span>
-                <select value={editedStudent.grade || ''} onChange={(e) => setEditedStudent(prev => ({ ...prev, grade: e.target.value }))} className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg bg-white">
+                <select 
+                  value={editedStudent.grade || ''} 
+                  onChange={(e) => setEditedStudent(prev => ({ ...prev, grade: e.target.value }))} 
+                  className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg bg-white"
+                >
                   <option value="11">Grade 11</option>
                   <option value="12">Grade 12</option>
                 </select>
               </label>
               <label className="block text-sm sm:col-span-2">
                 <span className="text-gray-700 font-medium">Section</span>
-                <input value={editedStudent.section || ''} onChange={(e) => setEditedStudent(prev => ({ ...prev, section: e.target.value }))} className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg" />
+                <input 
+                  value={editedStudent.section || ''} 
+                  onChange={(e) => setEditedStudent(prev => ({ ...prev, section: e.target.value }))} 
+                  className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg" 
+                />
               </label>
             </div>
             <div className="mt-6 flex flex-col sm:flex-row gap-3 sm:justify-end">
@@ -899,4 +1006,3 @@ export default function SuperAdminStudentsPage() {
     </div>
   )
 }
-
