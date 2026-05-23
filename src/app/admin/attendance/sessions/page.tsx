@@ -14,16 +14,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Trash2,
-  AlertCircle,
-  Settings,
-  Save,
   UserCircle,
   CheckCircle,
   XCircle,
   Filter,
   X,
-  Menu,
-  FileText,
   MessageSquare,
   ChevronDown,
   ChevronUp,
@@ -722,34 +717,34 @@ export default function AttendanceSessionsPage() {
     .sort((a, b) => Number(a.grade) - Number(b.grade))
 
   return (
-    <div className="space-y-4 sm:space-y-6 pb-20 sm:pb-0">
+    <div className="min-h-screen space-y-4 sm:space-y-6 pb-20 sm:pb-0 px-2 sm:px-0">
       {/* Confirmation Popup */}
       {showConfirmationPopup && (
-        <div className="fixed bottom-4 right-4 z-50 animate-in slide-in-from-bottom-2">
+        <div className="fixed bottom-4 right-4 left-4 sm:left-auto z-50 animate-in slide-in-from-bottom-2">
           <div className="bg-green-600 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-2">
-            <CheckCircle className="w-4 h-4" />
+            <CheckCircle className="w-4 h-4 flex-shrink-0" />
             <p className="text-sm font-medium">{confirmationMessage}</p>
           </div>
         </div>
       )}
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
-        <div>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+        <div className="w-full sm:w-auto">
           <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Attendance Sessions</h1>
-          <p className="text-xs sm:text-sm text-gray-600 mt-0.5 sm:mt-1">Create and manage attendance sessions</p>
+          <p className="text-xs sm:text-sm text-gray-600 mt-0.5">Create and manage attendance sessions</p>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className="sm:hidden flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex-1 justify-center"
+            className="sm:hidden flex items-center gap-2 px-3 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex-1 justify-center"
           >
             <Filter className="w-4 h-4" />
-            <span className="text-sm">Filter</span>
+            <span className="text-sm font-medium">Filters</span>
           </button>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-md hover:shadow-lg flex-1 sm:flex-initial justify-center text-sm font-medium"
+            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-sm hover:shadow-md flex-1 sm:flex-initial justify-center text-sm font-medium"
           >
             <Plus className="w-4 h-4" />
             <span>New Session</span>
@@ -757,36 +752,38 @@ export default function AttendanceSessionsPage() {
         </div>
       </div>
 
-      {/* Active Sessions Summary */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl p-5 text-white">
+      {/* Overview Cards - Responsive Grid */}
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl p-4 sm:p-5 text-white">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">Overview</h2>
+          <h2 className="text-base sm:text-lg font-semibold">Overview</h2>
           <Calendar className="w-5 h-5 opacity-80" />
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div>
-            <p className="text-blue-100 text-xs">Active Sessions</p>
-            <p className="text-2xl font-bold">{sessions.filter(s => s.is_active).length}</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+          <div className="bg-white/10 rounded-lg p-3">
+            <p className="text-blue-100 text-xs">Active</p>
+            <p className="text-xl sm:text-2xl font-bold mt-1">{sessions.filter(s => s.is_active).length}</p>
           </div>
-          <div>
-            <p className="text-blue-100 text-xs">Today's Sessions</p>
-            <p className="text-2xl font-bold">
+          <div className="bg-white/10 rounded-lg p-3">
+            <p className="text-blue-100 text-xs">Today</p>
+            <p className="text-xl sm:text-2xl font-bold mt-1">
               {sessions.filter(s => s.date === new Date().toISOString().split('T')[0]).length}
             </p>
           </div>
-          <div>
-            <p className="text-blue-100 text-xs">Total Classes</p>
-            <p className="text-2xl font-bold">{sections.length}</p>
+          <div className="bg-white/10 rounded-lg p-3">
+            <p className="text-blue-100 text-xs">Classes</p>
+            <p className="text-xl sm:text-2xl font-bold mt-1">{sections.length}</p>
           </div>
-          <div>
-            <p className="text-blue-100 text-xs">Total Sessions</p>
-            <p className="text-2xl font-bold">{sessions.length}</p>
+          <div className="bg-white/10 rounded-lg p-3">
+            <p className="text-blue-100 text-xs">Total</p>
+            <p className="text-xl sm:text-2xl font-bold mt-1">{sessions.length}</p>
           </div>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className={`bg-white rounded-xl shadow-sm border border-gray-200 p-4 transition-all duration-300 ${showFilters ? 'block' : 'hidden sm:block'}`}>
+      {/* Filters - Improved Mobile Layout */}
+      <div className={`bg-white rounded-xl shadow-sm border border-gray-200 p-4 transition-all duration-300 ${
+        showFilters ? 'block' : 'hidden sm:block'
+      }`}>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -795,7 +792,7 @@ export default function AttendanceSessionsPage() {
               placeholder="Search sessions..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+              className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
             />
           </div>
 
@@ -803,7 +800,7 @@ export default function AttendanceSessionsPage() {
             <select
               value={selectedTeacher}
               onChange={(e) => setSelectedTeacher(e.target.value)}
-              className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
+              className="px-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
             >
               <option value="all">All Teachers</option>
               {teachers.map(teacher => (
@@ -817,7 +814,7 @@ export default function AttendanceSessionsPage() {
           <select
             value={selectedSection}
             onChange={(e) => setSelectedSection(e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
+            className="px-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
           >
             <option value="all">All Grades</option>
             {groupedSectionList.map(group => (
@@ -830,7 +827,7 @@ export default function AttendanceSessionsPage() {
           <select
             value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
+            className="px-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
           >
             <option value="all">All Status</option>
             <option value="active">Active</option>
@@ -839,20 +836,75 @@ export default function AttendanceSessionsPage() {
         </div>
       </div>
 
-      {/* Sessions Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      {/* Mobile Card View */}
+      <div className="block sm:hidden space-y-3">
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <div className="w-8 h-8 border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin"></div>
+          </div>
+        ) : paginatedSessions.length === 0 ? (
+          <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-200">
+            <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-500">No attendance sessions found</p>
+          </div>
+        ) : (
+          <>
+            {paginatedSessions.map((session) => (
+              <MobileSessionCard
+                key={session.id}
+                session={session}
+                isExpanded={expandedRows.has(session.id)}
+                onToggleExpand={() => toggleRowExpand(session.id)}
+                onViewDetails={() => handleOpenSessionDetails(session)}
+                onEnd={() => {
+                  setSelectedSession(session)
+                  setShowEndModal(true)
+                }}
+                onDelete={handleDeleteSession}
+                formatTime={formatTime}
+              />
+            ))}
+            
+            {/* Mobile Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="p-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="text-sm font-medium text-gray-600">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="p-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="hidden sm:block bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[900px]">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="w-10 px-4 py-3"></th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Teacher</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Class</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Description</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider hidden lg:table-cell">Description</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Date</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Time</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Thresholds</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider hidden md:table-cell">Thresholds</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Attendance</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
               </tr>
@@ -893,7 +945,7 @@ export default function AttendanceSessionsPage() {
           </table>
         </div>
 
-        {/* Pagination */}
+        {/* Desktop Pagination */}
         {filteredSessions.length > 0 && (
           <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3">
             <p className="text-sm text-gray-600">
@@ -922,19 +974,19 @@ export default function AttendanceSessionsPage() {
         )}
       </div>
 
-      {/* Session Details Modal */}
+      {/* Session Details Modal - Responsive */}
       {showSessionDetailsModal && sessionForDetails && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 p-5 z-10">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-xl font-bold text-gray-800">Session Attendance Details</h3>
-                  <p className="text-sm text-gray-600 mt-1">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white rounded-xl w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 p-4 sm:p-5 z-10">
+              <div className="flex items-start sm:items-center justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-lg sm:text-xl font-bold text-gray-800">Session Attendance Details</h3>
+                  <p className="text-xs sm:text-sm text-gray-600 mt-1">
                     Grade {sessionForDetails.grade} • {sessionForDetails.section} • {new Date(sessionForDetails.date).toLocaleDateString()}
                   </p>
                   {sessionForDetails.session_description && (
-                    <p className="text-xs text-gray-500 mt-1">{sessionForDetails.session_description}</p>
+                    <p className="text-xs text-gray-500 mt-1 truncate">{sessionForDetails.session_description}</p>
                   )}
                 </div>
                 <button
@@ -942,7 +994,7 @@ export default function AttendanceSessionsPage() {
                     setShowSessionDetailsModal(false)
                     setSessionForDetails(null)
                   }}
-                  className="p-2 text-gray-400 hover:text-gray-700 rounded-lg hover:bg-gray-100"
+                  className="p-2 text-gray-400 hover:text-gray-700 rounded-lg hover:bg-gray-100 flex-shrink-0"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -954,24 +1006,24 @@ export default function AttendanceSessionsPage() {
                 <div className="w-10 h-10 border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin"></div>
               </div>
             ) : (
-              <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-5">
+              <div className="p-4 sm:p-5 grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
                 {/* Present */}
                 <div className="border border-green-200 bg-green-50 rounded-xl overflow-hidden">
-                  <div className="bg-green-100 px-4 py-3 border-b border-green-200">
+                  <div className="bg-green-100 px-3 sm:px-4 py-2.5 sm:py-3 border-b border-green-200">
                     <div className="flex items-center justify-between">
-                      <h4 className="font-semibold text-green-800">Present</h4>
+                      <h4 className="font-semibold text-green-800 text-sm sm:text-base">Present</h4>
                       <span className="px-2 py-0.5 rounded-full bg-green-200 text-green-800 text-xs font-bold">
                         {sessionDetails.present.length}
                       </span>
                     </div>
                   </div>
-                  <div className="max-h-96 overflow-y-auto divide-y divide-green-100">
+                  <div className="max-h-64 sm:max-h-96 overflow-y-auto divide-y divide-green-100">
                     {sessionDetails.present.length === 0 ? (
-                      <div className="p-4 text-center text-green-600 text-sm">No students marked present</div>
+                      <div className="p-4 text-center text-green-600 text-xs sm:text-sm">No students marked present</div>
                     ) : (
                       sessionDetails.present.map((student) => (
-                        <div key={student.id} className="p-3 hover:bg-green-100/50 transition-colors">
-                          <p className="font-medium text-gray-800 text-sm">{student.full_name}</p>
+                        <div key={student.id} className="p-2.5 sm:p-3 hover:bg-green-100/50 transition-colors">
+                          <p className="font-medium text-gray-800 text-xs sm:text-sm">{student.full_name}</p>
                           <p className="text-xs text-gray-500">LRN: {student.lrn}</p>
                           {student.time_in && <p className="text-xs text-green-600 mt-1">⏰ {formatTime(student.time_in)}</p>}
                         </div>
@@ -982,21 +1034,21 @@ export default function AttendanceSessionsPage() {
 
                 {/* Late */}
                 <div className="border border-yellow-200 bg-yellow-50 rounded-xl overflow-hidden">
-                  <div className="bg-yellow-100 px-4 py-3 border-b border-yellow-200">
+                  <div className="bg-yellow-100 px-3 sm:px-4 py-2.5 sm:py-3 border-b border-yellow-200">
                     <div className="flex items-center justify-between">
-                      <h4 className="font-semibold text-yellow-800">Late</h4>
+                      <h4 className="font-semibold text-yellow-800 text-sm sm:text-base">Late</h4>
                       <span className="px-2 py-0.5 rounded-full bg-yellow-200 text-yellow-800 text-xs font-bold">
                         {sessionDetails.late.length}
                       </span>
                     </div>
                   </div>
-                  <div className="max-h-96 overflow-y-auto divide-y divide-yellow-100">
+                  <div className="max-h-64 sm:max-h-96 overflow-y-auto divide-y divide-yellow-100">
                     {sessionDetails.late.length === 0 ? (
-                      <div className="p-4 text-center text-yellow-600 text-sm">No students marked late</div>
+                      <div className="p-4 text-center text-yellow-600 text-xs sm:text-sm">No students marked late</div>
                     ) : (
                       sessionDetails.late.map((student) => (
-                        <div key={student.id} className="p-3 hover:bg-yellow-100/50 transition-colors">
-                          <p className="font-medium text-gray-800 text-sm">{student.full_name}</p>
+                        <div key={student.id} className="p-2.5 sm:p-3 hover:bg-yellow-100/50 transition-colors">
+                          <p className="font-medium text-gray-800 text-xs sm:text-sm">{student.full_name}</p>
                           <p className="text-xs text-gray-500">LRN: {student.lrn}</p>
                           {student.time_in && <p className="text-xs text-yellow-600 mt-1">⏰ {formatTime(student.time_in)}</p>}
                         </div>
@@ -1007,21 +1059,21 @@ export default function AttendanceSessionsPage() {
 
                 {/* Absent */}
                 <div className="border border-red-200 bg-red-50 rounded-xl overflow-hidden">
-                  <div className="bg-red-100 px-4 py-3 border-b border-red-200">
+                  <div className="bg-red-100 px-3 sm:px-4 py-2.5 sm:py-3 border-b border-red-200">
                     <div className="flex items-center justify-between">
-                      <h4 className="font-semibold text-red-800">Absent</h4>
+                      <h4 className="font-semibold text-red-800 text-sm sm:text-base">Absent</h4>
                       <span className="px-2 py-0.5 rounded-full bg-red-200 text-red-800 text-xs font-bold">
                         {sessionDetails.absent.length}
                       </span>
                     </div>
                   </div>
-                  <div className="max-h-96 overflow-y-auto divide-y divide-red-100">
+                  <div className="max-h-64 sm:max-h-96 overflow-y-auto divide-y divide-red-100">
                     {sessionDetails.absent.length === 0 ? (
-                      <div className="p-4 text-center text-red-600 text-sm">No students marked absent</div>
+                      <div className="p-4 text-center text-red-600 text-xs sm:text-sm">No students marked absent</div>
                     ) : (
                       sessionDetails.absent.map((student) => (
-                        <div key={student.id} className="p-3 hover:bg-red-100/50 transition-colors">
-                          <p className="font-medium text-gray-800 text-sm">{student.full_name}</p>
+                        <div key={student.id} className="p-2.5 sm:p-3 hover:bg-red-100/50 transition-colors">
+                          <p className="font-medium text-gray-800 text-xs sm:text-sm">{student.full_name}</p>
                           <p className="text-xs text-gray-500">LRN: {student.lrn}</p>
                           {student.notes && <p className="text-xs text-red-600 mt-1">📝 {student.notes}</p>}
                         </div>
@@ -1035,23 +1087,23 @@ export default function AttendanceSessionsPage() {
         </div>
       )}
 
-      {/* Create Session Modal - Simplified */}
+      {/* Create Session Modal - Responsive */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-md w-full shadow-xl">
-            <div className="p-5 border-b border-gray-200">
+          <div className="bg-white rounded-xl w-full max-w-md shadow-xl">
+            <div className="p-4 sm:p-5 border-b border-gray-200">
               <div className="flex justify-between items-center">
-                <h3 className="text-xl font-bold text-gray-800">Create New Session</h3>
+                <h3 className="text-lg sm:text-xl font-bold text-gray-800">Create New Session</h3>
                 <button onClick={() => setShowCreateModal(false)} className="p-1 text-gray-400 hover:text-gray-700">
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-xs sm:text-sm text-gray-500 mt-1">
                 Creating as: <span className="font-semibold text-blue-600">{getCurrentAdminName()}</span>
               </p>
             </div>
             
-            <form onSubmit={handleCreateSession} className="p-5 space-y-4">
+            <form onSubmit={handleCreateSession} className="p-4 sm:p-5 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Select Grade <span className="text-red-500">*</span>
@@ -1063,7 +1115,7 @@ export default function AttendanceSessionsPage() {
                     setNewSession({ ...newSession, grade })
                   }}
                   required
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
                 >
                   <option value="">Choose a grade</option>
                   {groupedSectionList.map(g => (
@@ -1082,7 +1134,7 @@ export default function AttendanceSessionsPage() {
                   onChange={(e) => setNewSession({ ...newSession, date: e.target.value })}
                   required
                   min={new Date().toISOString().split('T')[0]}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
                 />
               </div>
 
@@ -1093,14 +1145,14 @@ export default function AttendanceSessionsPage() {
                   onChange={(e) => setNewSession({ ...newSession, session_description: e.target.value })}
                   placeholder="e.g., First Quarter Examination, Chapter 3 Discussion..."
                   rows={3}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none text-sm"
                 />
               </div>
 
-              <div className="bg-blue-50 p-4 rounded-lg">
+              <div className="bg-blue-50 p-3 sm:p-4 rounded-lg">
                 <div className="flex items-start gap-3">
-                  <Info className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
-                  <div className="text-sm text-blue-800">
+                  <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <div className="text-xs sm:text-sm text-blue-800">
                     <p className="font-medium mb-1">Automatic Thresholds</p>
                     <ul className="text-xs space-y-1 list-disc list-inside">
                       <li>Session starts immediately when created</li>
@@ -1112,41 +1164,52 @@ export default function AttendanceSessionsPage() {
               </div>
 
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setShowCreateModal(false)} className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium">Cancel</button>
-                <button type="submit" className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium">Create Session</button>
+                <button 
+                  type="button" 
+                  onClick={() => setShowCreateModal(false)} 
+                  className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
+                >
+                  Create Session
+                </button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* End Session Modal */}
+      {/* End Session Modal - Responsive */}
       {showEndModal && selectedSession && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-md w-full p-6">
+          <div className="bg-white rounded-xl w-full max-w-md p-5 sm:p-6">
             <div className="text-center">
-              <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Pause className="w-8 h-8 text-amber-600" />
+              <div className="w-14 h-14 sm:w-16 sm:h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Pause className="w-7 h-7 sm:w-8 sm:h-8 text-amber-600" />
               </div>
-              <h3 className="text-xl font-bold text-gray-800 mb-2">End Session</h3>
-              <p className="text-gray-600 mb-4">
+              <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-2">End Session</h3>
+              <p className="text-sm text-gray-600 mb-4">
                 End session for Grade {selectedSession.grade}?
               </p>
               <div className="bg-amber-50 p-3 rounded-lg mb-6">
-                <p className="text-sm text-amber-700">
+                <p className="text-xs sm:text-sm text-amber-700">
                   Students who haven't scanned by {formatTime(selectedSession.absent_threshold)} will be marked as ABSENT.
                 </p>
               </div>
               <div className="flex gap-3">
                 <button
                   onClick={() => setShowEndModal(false)}
-                  className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                  className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleEndSession}
-                  className="flex-1 px-4 py-2.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors font-medium"
+                  className="flex-1 px-4 py-2.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors font-medium text-sm"
                 >
                   End Session
                 </button>
@@ -1159,7 +1222,201 @@ export default function AttendanceSessionsPage() {
   )
 }
 
-// Session Row Component
+// Mobile Session Card Component
+function MobileSessionCard({ session, isExpanded, onToggleExpand, onViewDetails, onEnd, onDelete, formatTime }: {
+  session: AttendanceSession
+  isExpanded: boolean
+  onToggleExpand: () => void
+  onViewDetails: () => void
+  onEnd: () => void
+  onDelete: (id: string) => void
+  formatTime: (time: string) => string
+}) {
+  const [attendanceCount, setAttendanceCount] = useState(0)
+  const [attendanceBreakdown, setAttendanceBreakdown] = useState({
+    present: 0,
+    late: 0,
+    absent: 0
+  })
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetchAttendanceStats()
+  }, [session.id])
+
+  const fetchAttendanceStats = async () => {
+    try {
+      const { count, error: countError } = await supabase
+        .from('attendance')
+        .select('*', { count: 'exact', head: true })
+        .eq('session_id', session.id)
+
+      if (countError) throw countError
+      setAttendanceCount(count || 0)
+
+      const { data, error: breakdownError } = await supabase
+        .from('attendance')
+        .select('status')
+        .eq('session_id', session.id)
+
+      if (breakdownError) throw breakdownError
+
+      const breakdown = {
+        present: data?.filter(a => a.status === 'present').length || 0,
+        late: data?.filter(a => a.status === 'late').length || 0,
+        absent: data?.filter(a => a.status === 'absent').length || 0
+      }
+      setAttendanceBreakdown(breakdown)
+    } catch (error) {
+      console.error('Error fetching attendance stats:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const lateThresholdTime = session.late_threshold ? formatTime(session.late_threshold) : 'N/A'
+  const absentThresholdTime = session.absent_threshold ? formatTime(session.absent_threshold) : 'N/A'
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      {/* Card Header */}
+      <div className="p-4">
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <UserCircle className="w-4 h-4 text-gray-400 flex-shrink-0" />
+              <span className="font-medium text-sm truncate">
+                {session.admin_users?.full_name?.split(' ')[0] || 'Unknown'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <span className="font-medium">G{session.grade}</span>
+              <span>•</span>
+              <span>{session.section}</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {session.is_active ? (
+              <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+                <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+                Active
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">
+                Ended
+              </span>
+            )}
+          </div>
+        </div>
+
+        {session.session_description && (
+          <div className="flex items-start gap-2 mb-3">
+            <MessageSquare className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-gray-600 line-clamp-2">{session.session_description}</p>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+            <span className="text-xs text-gray-600">{new Date(session.date).toLocaleDateString()}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Clock className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+            <span className="text-xs text-gray-600">{formatTime(session.start_time)}</span>
+          </div>
+        </div>
+
+        {/* Attendance Stats */}
+        <div className="flex items-center justify-between mb-3">
+          {loading ? (
+            <div className="w-5 h-5 border-2 border-gray-200 border-t-blue-600 rounded-full animate-spin"></div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1">
+                <CheckCircle className="w-3.5 h-3.5 text-green-600" />
+                <span className="text-xs font-medium text-green-600">{attendanceBreakdown.present}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5 text-amber-600" />
+                <span className="text-xs font-medium text-amber-600">{attendanceBreakdown.late}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <XCircle className="w-3.5 h-3.5 text-red-600" />
+                <span className="text-xs font-medium text-red-600">{attendanceBreakdown.absent}</span>
+              </div>
+              <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                {attendanceCount}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onViewDetails}
+            className="flex-1 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+          >
+            View Details
+          </button>
+          {session.is_active ? (
+            <button
+              onClick={onEnd}
+              className="px-3 py-1.5 text-xs font-medium text-amber-600 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors"
+            >
+              End Session
+            </button>
+          ) : (
+            <button
+              onClick={() => onDelete(session.id)}
+              className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+            >
+              Delete
+            </button>
+          )}
+          <button
+            onClick={onToggleExpand}
+            className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+        </div>
+      </div>
+
+      {/* Expanded Content */}
+      {isExpanded && (
+        <div className="border-t border-gray-200 p-4 bg-gray-50">
+          <div className="space-y-3">
+            <div className="bg-white rounded-lg p-3 border border-gray-200">
+              <h4 className="font-medium text-xs text-gray-700 mb-2">Session Info</h4>
+              <div className="space-y-1 text-xs">
+                <p><span className="text-gray-500">Teacher:</span> {session.admin_users?.full_name || 'Unknown'}</p>
+                <p><span className="text-gray-500">Grade:</span> {session.grade}</p>
+                <p><span className="text-gray-500">Section:</span> {session.section}</p>
+                <p><span className="text-gray-500">Started:</span> {formatTime(session.start_time)}</p>
+                {session.end_time && <p><span className="text-gray-500">Ended:</span> {formatTime(session.end_time)}</p>}
+              </div>
+            </div>
+            <div className="bg-white rounded-lg p-3 border border-gray-200">
+              <h4 className="font-medium text-xs text-gray-700 mb-2">Thresholds</h4>
+              <div className="space-y-1 text-xs">
+                <p><span className="text-gray-500">Late after:</span> {lateThresholdTime}</p>
+                <p><span className="text-gray-500">Absent after:</span> {absentThresholdTime}</p>
+              </div>
+            </div>
+            <div className="bg-white rounded-lg p-3 border border-gray-200">
+              <h4 className="font-medium text-xs text-gray-700 mb-2">Description</h4>
+              <p className="text-xs text-gray-600">{session.session_description || 'No description provided'}</p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Desktop Session Row Component
 function SessionRow({ session, isExpanded, onToggleExpand, onViewDetails, onEnd, onDelete, formatTime }: {
   session: AttendanceSession
   isExpanded: boolean
@@ -1211,7 +1468,6 @@ function SessionRow({ session, isExpanded, onToggleExpand, onViewDetails, onEnd,
     }
   }
 
-  // Calculate thresholds display
   const lateThresholdTime = session.late_threshold ? formatTime(session.late_threshold) : 'N/A'
   const absentThresholdTime = session.absent_threshold ? formatTime(session.absent_threshold) : 'N/A'
 
@@ -1238,7 +1494,7 @@ function SessionRow({ session, isExpanded, onToggleExpand, onViewDetails, onEnd,
             <span className="font-medium text-sm">G{session.grade}</span>
           </div>
         </td>
-        <td className="px-4 py-3" onClick={onViewDetails}>
+        <td className="px-4 py-3 hidden lg:table-cell" onClick={onViewDetails}>
           {session.session_description ? (
             <div className="flex items-center gap-2 max-w-xs cursor-pointer">
               <MessageSquare className="w-3 h-3 text-gray-400 shrink-0" />
@@ -1247,7 +1503,7 @@ function SessionRow({ session, isExpanded, onToggleExpand, onViewDetails, onEnd,
               </span>
             </div>
           ) : (
-            <span className="text-sm text-gray-400 italic cursor-pointer" onClick={onViewDetails}>—</span>
+            <span className="text-sm text-gray-400 italic cursor-pointer">—</span>
           )}
         </td>
         <td className="px-4 py-3" onClick={onViewDetails}>
@@ -1274,7 +1530,7 @@ function SessionRow({ session, isExpanded, onToggleExpand, onViewDetails, onEnd,
             </span>
           )}
         </td>
-        <td className="px-4 py-3">
+        <td className="px-4 py-3 hidden md:table-cell">
           <div className="text-xs text-gray-500 space-y-0.5">
             <div className="flex items-center gap-1">
               <span className="w-12">Late:</span>
@@ -1361,75 +1617,5 @@ function SessionRow({ session, isExpanded, onToggleExpand, onViewDetails, onEnd,
         </tr>
       )}
     </>
-  )
-}
-
-// Attendance Stats Component
-function AttendanceStats({ sessionId }: { sessionId: string }) {
-  const [attendanceCount, setAttendanceCount] = useState(0)
-  const [attendanceBreakdown, setAttendanceBreakdown] = useState({
-    present: 0,
-    late: 0,
-    absent: 0
-  })
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    fetchAttendanceStats()
-  }, [sessionId])
-
-  const fetchAttendanceStats = async () => {
-    try {
-      const { count, error: countError } = await supabase
-        .from('attendance')
-        .select('*', { count: 'exact', head: true })
-        .eq('session_id', sessionId)
-
-      if (countError) throw countError
-      setAttendanceCount(count || 0)
-
-      const { data, error: breakdownError } = await supabase
-        .from('attendance')
-        .select('status')
-        .eq('session_id', sessionId)
-
-      if (breakdownError) throw breakdownError
-
-      const breakdown = {
-        present: data?.filter(a => a.status === 'present').length || 0,
-        late: data?.filter(a => a.status === 'late').length || 0,
-        absent: data?.filter(a => a.status === 'absent').length || 0
-      }
-      setAttendanceBreakdown(breakdown)
-
-    } catch (error) {
-      console.error('Error fetching attendance stats:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  if (loading) {
-    return <div className="w-5 h-5 border-2 border-gray-200 border-t-blue-600 rounded-full animate-spin"></div>
-  }
-
-  return (
-    <div className="flex items-center gap-2 text-xs">
-      <span className="flex items-center gap-1">
-        <CheckCircle className="w-3 h-3 text-green-600" />
-        <span className="text-green-600">{attendanceBreakdown.present}</span>
-      </span>
-      <span className="flex items-center gap-1">
-        <Clock className="w-3 h-3 text-yellow-600" />
-        <span className="text-yellow-600">{attendanceBreakdown.late}</span>
-      </span>
-      <span className="flex items-center gap-1">
-        <XCircle className="w-3 h-3 text-red-600" />
-        <span className="text-red-600">{attendanceBreakdown.absent}</span>
-      </span>
-      <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs ml-1">
-        {attendanceCount}
-      </span>
-    </div>
   )
 }
