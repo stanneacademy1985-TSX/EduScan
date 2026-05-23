@@ -61,6 +61,9 @@ interface RecentActivityItem {
   status: 'present' | 'late' | 'absent'
   section: string
   students: {
+    first_name?: string
+    middle_name?: string
+    last_name?: string
     full_name?: string
     lrn?: string
     grade?: string
@@ -74,37 +77,74 @@ interface AttendanceTrendPoint {
   absent: number
 }
 
-// Helper function to format name with proper capitalization and middle initial
-const formatFullName = (fullName: string | undefined): string => {
-  if (!fullName) return 'Unknown Student'
-  
-  const nameParts = fullName.trim().split(/\s+/)
-  
-  if (nameParts.length === 1) {
-    // Only first name
-    return capitalizeName(nameParts[0])
-  } else if (nameParts.length === 2) {
-    // First and Last name only
-    return `${capitalizeName(nameParts[0])} ${capitalizeName(nameParts[1])}`
-  } else if (nameParts.length >= 3) {
-    // First, Middle, Last name - format as "First M. Last"
-    const firstName = capitalizeName(nameParts[0])
-    const middleInitial = nameParts[1].charAt(0).toUpperCase()
-    const lastName = capitalizeName(nameParts[nameParts.length - 1])
-    return `${firstName} ${middleInitial}. ${lastName}`
-  }
-  
-  return capitalizeName(fullName)
-}
-
 // Helper function to capitalize first letter of each word
 const capitalizeName = (name: string): string => {
-  if (!name) return name
+  if (!name) return ''
   return name
     .toLowerCase()
     .split(' ')
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ')
+}
+
+// Format full name for display using separate fields
+const formatNameFromFields = (firstName: string, middleName: string, lastName: string): string => {
+  const first = capitalizeName(firstName || '')
+  const last = capitalizeName(lastName || '')
+  
+  if (!first && !last) return 'Unknown User'
+  
+  if (middleName && middleName.trim()) {
+    const middleInitial = middleName.trim().charAt(0).toUpperCase()
+    return `${first} ${middleInitial}. ${last}`
+  }
+  return `${first} ${last}`.trim()
+}
+
+// Get formatted student name from student object (handles both scenarios)
+const getFormattedStudentName = (student: any): string => {
+  if (!student) return 'Unknown Student'
+  
+  // Use separate fields if available
+  if (student.first_name && student.last_name) {
+    return formatNameFromFields(student.first_name, student.middle_name || '', student.last_name)
+  }
+  
+  // Fallback to full_name if separate fields not available
+  if (student.full_name) {
+    const nameParts = student.full_name.trim().split(/\s+/)
+    if (nameParts.length === 1) {
+      return capitalizeName(nameParts[0])
+    } else if (nameParts.length === 2) {
+      return `${capitalizeName(nameParts[0])} ${capitalizeName(nameParts[1])}`
+    } else if (nameParts.length >= 3) {
+      const firstName = capitalizeName(nameParts[0])
+      const middleInitial = nameParts[1].charAt(0).toUpperCase()
+      const lastName = capitalizeName(nameParts[nameParts.length - 1])
+      return `${firstName} ${middleInitial}. ${lastName}`
+    }
+    return capitalizeName(student.full_name)
+  }
+  
+  return 'Unknown Student'
+}
+
+// Format admin name from full_name
+const formatAdminName = (fullName: string): string => {
+  if (!fullName) return 'Super Admin'
+  
+  const nameParts = fullName.trim().split(/\s+/)
+  if (nameParts.length === 1) {
+    return capitalizeName(nameParts[0])
+  } else if (nameParts.length === 2) {
+    return `${capitalizeName(nameParts[0])} ${capitalizeName(nameParts[1])}`
+  } else if (nameParts.length >= 3) {
+    const firstName = capitalizeName(nameParts[0])
+    const middleInitial = nameParts[1].charAt(0).toUpperCase()
+    const lastName = capitalizeName(nameParts[nameParts.length - 1])
+    return `${firstName} ${middleInitial}. ${lastName}`
+  }
+  return capitalizeName(fullName)
 }
 
 export default function SuperAdminDashboard() {
@@ -122,7 +162,8 @@ export default function SuperAdminDashboard() {
         router.push('/super-admin/login')
         return
       }
-      setAdmin(JSON.parse(session))
+      const adminData = JSON.parse(session)
+      setAdmin(adminData)
       fetchDashboardData()
     }
     checkAuth()
@@ -135,6 +176,7 @@ export default function SuperAdminDashboard() {
       const report = await SuperAdminService.getOverallReport()
       setStats(report)
 
+      // Fetch recent activity with student name fields
       const { data: recent } = await supabase
         .from('attendance')
         .select(`
@@ -144,6 +186,9 @@ export default function SuperAdminDashboard() {
           status,
           section,
           students:student_id (
+            first_name,
+            middle_name,
+            last_name,
             full_name,
             lrn,
             grade
@@ -206,13 +251,16 @@ export default function SuperAdminDashboard() {
     )
   }
 
+  // Format admin name for welcome message
+  const adminName = admin ? formatAdminName(admin.full_name) : 'Super Admin'
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-800">
             Welcome, <span className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-              {admin?.full_name ? formatFullName(admin.full_name) : 'Super Admin'}
+              {adminName}
             </span>
           </h1>
           <p className="text-gray-600 mt-1">School-wide attendance overview and management</p>
@@ -446,38 +494,38 @@ export default function SuperAdminDashboard() {
             <div className="space-y-4">
               {recentActivity.map((activity) => {
                 const student = Array.isArray(activity.students) ? activity.students[0] : activity.students
-                const formattedName = formatFullName(student?.full_name)
+                const studentName = getFormattedStudentName(student)
 
                 return (
-                <div key={activity.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
-                      <Users className="w-5 h-5 text-indigo-600" />
+                  <div key={activity.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
+                        <Users className="w-5 h-5 text-indigo-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-800">
+                          {studentName}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {activity.section} • LRN: {student?.lrn}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium text-gray-800">
-                        {formattedName}
+                    <div className="text-right">
+                      <p className="text-sm font-medium text-gray-800">
+                        {new Date(activity.date).toLocaleDateString()}
                       </p>
                       <p className="text-xs text-gray-500">
-                        {activity.section} • LRN: {student?.lrn}
+                        {activity.time_in} • 
+                        <span className={`ml-1 font-medium ${
+                          activity.status === 'present' ? 'text-green-600' :
+                          activity.status === 'late' ? 'text-amber-600' : 'text-red-600'
+                        }`}>
+                          {activity.status}
+                        </span>
                       </p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-gray-800">
-                      {new Date(activity.date).toLocaleDateString()}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {activity.time_in} • 
-                      <span className={`ml-1 font-medium ${
-                        activity.status === 'present' ? 'text-green-600' :
-                        activity.status === 'late' ? 'text-amber-600' : 'text-red-600'
-                      }`}>
-                        {activity.status}
-                      </span>
-                    </p>
-                  </div>
-                </div>
                 )
               })}
             </div>
