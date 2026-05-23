@@ -1010,27 +1010,27 @@ export default function QRScannerPage() {
     switch (status) {
       case 'present':
         return {
-          card: 'bg-green-50 border-green-400 active:bg-green-100',
+          card: 'bg-green-50 border-green-400',
           badge: 'bg-green-200 text-green-800',
-          dot: 'bg-green-500'
+          bar: 'bg-green-500'
         }
       case 'late':
         return {
-          card: 'bg-yellow-50 border-yellow-400 active:bg-yellow-100',
+          card: 'bg-yellow-50 border-yellow-400',
           badge: 'bg-yellow-200 text-yellow-800',
-          dot: 'bg-yellow-500'
+          bar: 'bg-yellow-500'
         }
       case 'absent':
         return {
-          card: 'bg-red-50 border-red-400 active:bg-red-100',
+          card: 'bg-red-50 border-red-400',
           badge: 'bg-red-200 text-red-800',
-          dot: 'bg-red-500'
+          bar: 'bg-red-500'
         }
       default:
         return {
-          card: 'border-gray-200 bg-white hover:border-blue-300 hover:shadow-md active:bg-gray-50',
+          card: 'border-gray-200 bg-white hover:border-blue-300 hover:shadow-md',
           badge: '',
-          dot: 'bg-gray-300'
+          bar: 'bg-gray-300'
         }
     }
   }
@@ -1139,8 +1139,8 @@ export default function QRScannerPage() {
                 <Scan className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
               </div>
               <div className="min-w-0">
-                <p className="text-xs sm:text-sm text-gray-600 truncate">Today's Scans</p>
-                <p className="text-lg sm:text-xl font-bold text-gray-800">{stats.todayScans}</p>
+                <p className="text-[10px] sm:text-xs lg:text-sm text-gray-600 truncate">Today's Scans</p>
+                <p className="text-base sm:text-lg lg:text-xl font-bold text-gray-800">{stats.todayScans}</p>
               </div>
             </div>
           </div>
@@ -1151,8 +1151,8 @@ export default function QRScannerPage() {
                 <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
               </div>
               <div className="min-w-0">
-                <p className="text-xs sm:text-sm text-gray-600 truncate">Present</p>
-                <p className="text-lg sm:text-xl font-bold text-green-600">{stats.presentCount}</p>
+                <p className="text-[10px] sm:text-xs lg:text-sm text-gray-600 truncate">Present</p>
+                <p className="text-base sm:text-lg lg:text-xl font-bold text-green-600">{stats.presentCount}</p>
               </div>
             </div>
           </div>
@@ -1163,8 +1163,8 @@ export default function QRScannerPage() {
                 <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-600" />
               </div>
               <div className="min-w-0">
-                <p className="text-xs sm:text-sm text-gray-600 truncate">Late</p>
-                <p className="text-lg sm:text-xl font-bold text-yellow-600">{stats.lateCount}</p>
+                <p className="text-[10px] sm:text-xs lg:text-sm text-gray-600 truncate">Late</p>
+                <p className="text-base sm:text-lg lg:text-xl font-bold text-yellow-600">{stats.lateCount}</p>
               </div>
             </div>
           </div>
@@ -1175,8 +1175,8 @@ export default function QRScannerPage() {
                 <XCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-600" />
               </div>
               <div className="min-w-0">
-                <p className="text-xs sm:text-sm text-gray-600 truncate">Absent</p>
-                <p className="text-lg sm:text-xl font-bold text-red-600">{stats.absentCount}</p>
+                <p className="text-[10px] sm:text-xs lg:text-sm text-gray-600 truncate">Absent</p>
+                <p className="text-base sm:text-lg lg:text-xl font-bold text-red-600">{stats.absentCount}</p>
               </div>
             </div>
           </div>
@@ -1525,11 +1525,7 @@ export default function QRScannerPage() {
                       >
                         {/* Status Indicator Bar - Top */}
                         {isMarked && (
-                          <div className={`absolute top-0 left-0 right-0 h-1 sm:h-1.5 rounded-t-lg sm:rounded-t-xl ${
-                            status === 'present' ? 'bg-green-500' :
-                            status === 'late' ? 'bg-yellow-500' :
-                            'bg-red-500'
-                          }`}></div>
+                          <div className={`absolute top-0 left-0 right-0 h-1 sm:h-1.5 rounded-t-lg sm:rounded-t-xl ${statusStyles.bar}`}></div>
                         )}
 
                         {/* Seat Number Badge */}
@@ -1571,30 +1567,32 @@ export default function QRScannerPage() {
               </>
             )}
             
-            {/* Summary Stats - Mobile Optimized */}
+            {/* Summary Stats - Fully Responsive */}
             {sectionStudents.length > 0 && (
               <div className="mt-4 sm:mt-6 pt-3 sm:pt-4 border-t border-gray-200">
-                <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5 sm:gap-2">
-                  <div className="bg-blue-50 rounded-lg p-1.5 sm:p-2 text-center">
-                    <p className="text-[10px] sm:text-xs text-gray-600">Total</p>
-                    <p className="text-sm sm:text-lg font-bold text-blue-600">{sectionStudents.length}</p>
+                <div className="grid grid-cols-5 gap-1 sm:gap-1.5 md:gap-2">
+                  <div className="bg-blue-50 rounded-lg p-1.5 sm:p-2 md:p-2.5 text-center">
+                    <p className="text-[9px] sm:text-[10px] md:text-xs text-gray-600 truncate">Total</p>
+                    <p className="text-xs sm:text-sm md:text-base lg:text-lg font-bold text-blue-600 mt-0.5">{sectionStudents.length}</p>
                   </div>
-                  <div className="bg-green-50 rounded-lg p-1.5 sm:p-2 text-center">
-                    <p className="text-[10px] sm:text-xs text-gray-600">Present</p>
-                    <p className="text-sm sm:text-lg font-bold text-green-600">{stats.presentCount}</p>
+                  <div className="bg-green-50 rounded-lg p-1.5 sm:p-2 md:p-2.5 text-center">
+                    <p className="text-[9px] sm:text-[10px] md:text-xs text-gray-600 truncate">Present</p>
+                    <p className="text-xs sm:text-sm md:text-base lg:text-lg font-bold text-green-600 mt-0.5">{stats.presentCount}</p>
                   </div>
-                  <div className="bg-yellow-50 rounded-lg p-1.5 sm:p-2 text-center">
-                    <p className="text-[10px] sm:text-xs text-gray-600">Late</p>
-                    <p className="text-sm sm:text-lg font-bold text-yellow-600">{stats.lateCount}</p>
+                  <div className="bg-yellow-50 rounded-lg p-1.5 sm:p-2 md:p-2.5 text-center">
+                    <p className="text-[9px] sm:text-[10px] md:text-xs text-gray-600 truncate">Late</p>
+                    <p className="text-xs sm:text-sm md:text-base lg:text-lg font-bold text-yellow-600 mt-0.5">{stats.lateCount}</p>
                   </div>
-                  <div className="bg-red-50 rounded-lg p-1.5 sm:p-2 text-center">
-                    <p className="text-[10px] sm:text-xs text-gray-600">Absent</p>
-                    <p className="text-sm sm:text-lg font-bold text-red-600">{stats.absentCount}</p>
+                  <div className="bg-red-50 rounded-lg p-1.5 sm:p-2 md:p-2.5 text-center">
+                    <p className="text-[9px] sm:text-[10px] md:text-xs text-gray-600 truncate">Absent</p>
+                    <p className="text-xs sm:text-sm md:text-base lg:text-lg font-bold text-red-600 mt-0.5">{stats.absentCount}</p>
                   </div>
-                  <div className="bg-purple-50 rounded-lg p-1.5 sm:p-2 text-center col-span-3 sm:col-span-1">
-                    <p className="text-[10px] sm:text-xs text-gray-600">Complete</p>
-                    <p className="text-sm sm:text-lg font-bold text-purple-600">
-                      {Math.round(((stats.presentCount + stats.lateCount + stats.absentCount) / sectionStudents.length) * 100)}%
+                  <div className="bg-purple-50 rounded-lg p-1.5 sm:p-2 md:p-2.5 text-center">
+                    <p className="text-[9px] sm:text-[10px] md:text-xs text-gray-600 truncate">Complete</p>
+                    <p className="text-xs sm:text-sm md:text-base lg:text-lg font-bold text-purple-600 mt-0.5">
+                      {sectionStudents.length > 0 
+                        ? Math.round(((stats.presentCount + stats.lateCount + stats.absentCount) / sectionStudents.length) * 100)
+                        : 0}%
                     </p>
                   </div>
                 </div>
@@ -1651,7 +1649,10 @@ export default function QRScannerPage() {
         
         @media (max-width: 380px) {
           .grid-cols-3 {
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(3, 1fr);
+          }
+          .grid-cols-5 {
+            grid-template-columns: repeat(5, 1fr);
           }
         }
       `}</style>
