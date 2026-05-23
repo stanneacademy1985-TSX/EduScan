@@ -85,20 +85,17 @@ const formatStudentName = (student: Student): string => {
   return `${lastName}, ${firstName}`
 }
 
-// Simplified name for seat plan (just Last, First I.)
+// Simplified name for seat plan (just Last, First)
 const getSimplifiedName = (student: Student): string => {
   const lastName = student.last_name || ''
   const firstName = student.first_name || ''
-  const middleInitial = student.middle_name && student.middle_name.trim() 
-    ? student.middle_name.charAt(0).toUpperCase() + '.' 
-    : ''
   
   if (!lastName && !firstName) return student.full_name?.split(' ')[0] || 'Student'
   
-  if (middleInitial) {
-    return `${lastName}, ${firstName} ${middleInitial}`
+  if (lastName && firstName) {
+    return `${lastName}, ${firstName.charAt(0)}.`
   }
-  return `${lastName}, ${firstName}`
+  return lastName || firstName
 }
 
 // Helper function to capitalize first letter
@@ -974,6 +971,15 @@ export default function QRScannerPage() {
     }
   }
 
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'present': return 'border-green-500 bg-green-50'
+      case 'late': return 'border-yellow-500 bg-yellow-50'
+      case 'absent': return 'border-red-500 bg-red-50'
+      default: return 'border-gray-200 bg-white'
+    }
+  }
+
   const getStatusBadgeColor = (status: string) => {
     switch (status) {
       case 'present': return 'bg-green-500'
@@ -989,6 +995,13 @@ export default function QRScannerPage() {
     setDownloadingSeatPlan(true)
     
     try {
+      // Create a temporary div for printing
+      const printWindow = window.open('', '_blank')
+      if (!printWindow) {
+        alert('Please allow popups to download the seat plan')
+        return
+      }
+      
       const today = new Date().toLocaleDateString()
       const sessionInfo = selectedSessionDetails 
         ? `Grade ${selectedSessionDetails.grade} - ${selectedSessionDetails.section}`
@@ -1005,109 +1018,82 @@ export default function QRScannerPage() {
               padding: 0;
               box-sizing: border-box;
             }
-            @page {
-              size: landscape;
-              margin: 1.5cm;
-            }
             body {
-              font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+              padding: 40px;
               background: white;
-              padding: 20px;
             }
             .container {
-              max-width: 100%;
+              max-width: 1200px;
               margin: 0 auto;
             }
             .header {
               text-align: center;
               margin-bottom: 30px;
               padding-bottom: 20px;
-              border-bottom: 3px solid #e5e7eb;
+              border-bottom: 2px solid #e5e7eb;
             }
             .header h1 {
-              font-size: 28px;
+              font-size: 24px;
               color: #1f2937;
-              margin-bottom: 10px;
-              font-weight: 700;
+              margin-bottom: 8px;
             }
             .header p {
               color: #6b7280;
               font-size: 14px;
-              margin-top: 5px;
-            }
-            .header .subtitle {
-              font-size: 16px;
-              color: #4b5563;
-              margin-top: 8px;
             }
             .seat-grid {
               display: grid;
-              grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+              grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
               gap: 20px;
-              margin-top: 30px;
+              margin-top: 20px;
             }
             .seat-card {
-              background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
+              background: white;
               border: 2px solid #e5e7eb;
-              border-radius: 16px;
-              padding: 24px 16px;
+              border-radius: 12px;
+              padding: 20px 12px;
               text-align: center;
               position: relative;
               page-break-inside: avoid;
               break-inside: avoid;
-              box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-              transition: all 0.2s ease;
             }
             .seat-number {
               position: absolute;
-              top: -12px;
-              left: -12px;
-              width: 32px;
-              height: 32px;
-              background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
+              top: -10px;
+              left: -10px;
+              width: 28px;
+              height: 28px;
+              background: #374151;
               color: white;
               border-radius: 50%;
               display: flex;
               align-items: center;
               justify-content: center;
-              font-size: 13px;
+              font-size: 12px;
               font-weight: bold;
-              box-shadow: 0 2px 4px rgba(0,0,0,0.2);
             }
             .student-name {
               font-size: 16px;
               font-weight: 600;
               color: #1f2937;
-              margin-bottom: 12px;
+              margin-bottom: 8px;
               word-break: break-word;
-              line-height: 1.4;
             }
             .status-badge {
               display: inline-block;
-              padding: 6px 16px;
-              border-radius: 24px;
-              font-size: 12px;
-              font-weight: 700;
-              letter-spacing: 0.5px;
-              margin-top: 12px;
+              padding: 4px 12px;
+              border-radius: 20px;
+              font-size: 11px;
+              font-weight: 600;
+              margin-top: 8px;
             }
-            .present { 
-              background: #d1fae5; 
-              color: #065f46; 
-              border: 1px solid #34d399;
-            }
-            .late { 
-              background: #fef3c7; 
-              color: #92400e; 
-              border: 1px solid #fbbf24;
-            }
-            .absent { 
-              background: #fee2e2; 
-              color: #991b1b; 
-              border: 1px solid #f87171;
-            }
+            .present { background: #d1fae5; color: #065f46; border: 1px solid #34d399; }
+            .late { background: #fef3c7; color: #92400e; border: 1px solid #fbbf24; }
+            .absent { background: #fee2e2; color: #991b1b; border: 1px solid #f87171; }
+            .not-marked { background: #f3f4f6; color: #4b5563; border: 1px solid #d1d5db; }
             .footer {
-              margin-top: 50px;
+              margin-top: 40px;
               padding-top: 20px;
               border-top: 1px solid #e5e7eb;
               text-align: center;
@@ -1116,26 +1102,11 @@ export default function QRScannerPage() {
             }
             @media print {
               body {
-                padding: 0;
-                margin: 0;
+                padding: 20px;
               }
               .seat-card {
                 break-inside: avoid;
                 page-break-inside: avoid;
-                box-shadow: none;
-                border-color: #d1d5db;
-              }
-              .no-print {
-                display: none;
-              }
-            }
-            @media (max-width: 768px) {
-              .seat-grid {
-                grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-                gap: 15px;
-              }
-              .student-name {
-                font-size: 13px;
               }
             }
           </style>
@@ -1144,44 +1115,36 @@ export default function QRScannerPage() {
           <div class="container">
             <div class="header">
               <h1>📋 Classroom Seat Plan</h1>
-              <div class="subtitle">${sessionInfo}</div>
-              <p>Generated: ${today} • Total Students: ${seatArrangement.length}</p>
+              <p>${sessionInfo} • Generated: ${today}</p>
+              <p style="font-size: 12px; margin-top: 5px;">Total Students: ${seatArrangement.length}</p>
             </div>
             <div class="seat-grid">
               ${seatArrangement.map((student, index) => {
                 const status = studentAttendanceStatus[student.id]
                 const displayName = getSimplifiedName(student)
-                const statusClass = status === 'present' ? 'present' : status === 'late' ? 'late' : status === 'absent' ? 'absent' : ''
-                const statusText = status ? status.toUpperCase() : ''
+                const statusClass = status === 'present' ? 'present' : status === 'late' ? 'late' : status === 'absent' ? 'absent' : 'not-marked'
+                const statusText = status ? status.toUpperCase() : 'Not Marked'
                 
                 return `
                   <div class="seat-card">
                     <div class="seat-number">${index + 1}</div>
                     <div class="student-name">${displayName}</div>
-                    ${status ? `<div class="status-badge ${statusClass}">${statusText}</div>` : ''}
+                    <div class="status-badge ${statusClass}">${statusText}</div>
                   </div>
                 `
               }).join('')}
             </div>
             <div class="footer">
               <p>St. Anne's Academy - EduScan Attendance System</p>
-              <p style="margin-top: 5px;">* This seat plan shows the current attendance status</p>
             </div>
           </div>
         </body>
         </html>
       `
       
-      // Create a blob and open in new window for printing
-      const blob = new Blob([htmlContent], { type: 'text/html' })
-      const url = URL.createObjectURL(blob)
-      const printWindow = window.open(url, '_blank')
-      
-      if (!printWindow) {
-        alert('Please allow popups to print the seat plan')
-      }
-      
-      URL.revokeObjectURL(url)
+      printWindow.document.write(htmlContent)
+      printWindow.document.close()
+      printWindow.print()
       
     } catch (error) {
       console.error('Error generating seat plan:', error)
@@ -1193,9 +1156,9 @@ export default function QRScannerPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="w-12 h-12 border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-600">Loading scanner...</p>
         </div>
       </div>
@@ -1203,545 +1166,550 @@ export default function QRScannerPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6">
-      <div className="max-w-full mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Attendance Marking</h1>
-            <p className="text-sm md:text-base text-gray-600 mt-1">Record attendance via QR scanner or seat plan</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="bg-green-100 text-green-800 px-3 py-1.5 rounded-lg flex items-center gap-2 text-sm font-medium">
-              <Shield className="w-4 h-4" />
-              <span>Encryption Active</span>
-            </div>
-            <button
-              onClick={() => setSoundEnabled(!soundEnabled)}
-              className="p-2 text-gray-600 hover:bg-white rounded-lg transition-colors"
-              title={soundEnabled ? "Mute sounds" : "Unmute sounds"}
-            >
-              {soundEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
-            </button>
-            <button
-              onClick={() => fetchActiveSessions()}
-              className="p-2 text-gray-600 hover:bg-white rounded-lg transition-colors"
-              title="Refresh sessions"
-            >
-              <RefreshCw className="w-5 h-5" />
-            </button>
-          </div>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">Attendance Marking</h1>
+          <p className="text-gray-600">Record attendance via QR scanner or seat plan</p>
         </div>
-
-        {/* Tab Navigation */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="flex">
-            <button
-              onClick={() => setActiveTab('scanner')}
-              className={`flex-1 py-3 px-4 font-medium flex items-center justify-center gap-2 transition-all duration-200 text-sm md:text-base ${
-                activeTab === 'scanner'
-                  ? 'border-b-2 border-blue-600 text-blue-600 bg-blue-50'
-                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
-              }`}
-            >
-              <QrCode className="w-5 h-5" />
-              QR Scanner
-            </button>
-            <button
-              onClick={() => setActiveTab('seatplan')}
-              className={`flex-1 py-3 px-4 font-medium flex items-center justify-center gap-2 transition-all duration-200 text-sm md:text-base ${
-                activeTab === 'seatplan'
-                  ? 'border-b-2 border-blue-600 text-blue-600 bg-blue-50'
-                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
-              }`}
-            >
-              <LayoutGrid className="w-5 h-5" />
-              Seat Plan
-            </button>
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          <div className="bg-green-100 text-green-800 px-3 py-1.5 rounded-lg flex items-center gap-2 text-sm font-medium">
+            <Shield className="w-4 h-4" />
+            <span>Encryption Active</span>
           </div>
+          <button
+            onClick={() => setSoundEnabled(!soundEnabled)}
+            className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            title={soundEnabled ? "Mute sounds" : "Unmute sounds"}
+          >
+            {soundEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+          </button>
+          <button
+            onClick={() => fetchActiveSessions()}
+            className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            title="Refresh sessions"
+          >
+            <RefreshCw className="w-5 h-5" />
+          </button>
         </div>
+      </div>
 
-        {/* Stats Cards - Responsive Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3 md:p-4">
-            <div className="flex items-center gap-2 md:gap-3">
-              <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                <Scan className="w-4 h-4 md:w-5 md:h-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-xs md:text-sm text-gray-600">Today's Scans</p>
-                <p className="text-lg md:text-xl font-bold text-gray-800">{stats.todayScans}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3 md:p-4">
-            <div className="flex items-center gap-2 md:gap-3">
-              <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-green-100 flex items-center justify-center">
-                <CheckCircle className="w-4 h-4 md:w-5 md:h-5 text-green-600" />
-              </div>
-              <div>
-                <p className="text-xs md:text-sm text-gray-600">Present</p>
-                <p className="text-lg md:text-xl font-bold text-green-600">{stats.presentCount}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3 md:p-4">
-            <div className="flex items-center gap-2 md:gap-3">
-              <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-yellow-100 flex items-center justify-center">
-                <Clock className="w-4 h-4 md:w-5 md:h-5 text-yellow-600" />
-              </div>
-              <div>
-                <p className="text-xs md:text-sm text-gray-600">Late</p>
-                <p className="text-lg md:text-xl font-bold text-yellow-600">{stats.lateCount}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3 md:p-4">
-            <div className="flex items-center gap-2 md:gap-3">
-              <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-red-100 flex items-center justify-center">
-                <XCircle className="w-4 h-4 md:w-5 md:h-5 text-red-600" />
-              </div>
-              <div>
-                <p className="text-xs md:text-sm text-gray-600">Absent</p>
-                <p className="text-lg md:text-xl font-bold text-red-600">{stats.absentCount}</p>
-              </div>
-            </div>
-          </div>
+      {/* Tab Navigation */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="flex border-b border-gray-200">
+          <button
+            onClick={() => setActiveTab('scanner')}
+            className={`flex-1 py-3 px-4 font-medium flex items-center justify-center gap-2 transition-colors ${
+              activeTab === 'scanner'
+                ? 'border-b-2 border-blue-600 text-blue-600 bg-blue-50'
+                : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+            }`}
+          >
+            <QrCode className="w-5 h-5" />
+            QR Scanner
+          </button>
+          <button
+            onClick={() => setActiveTab('seatplan')}
+            className={`flex-1 py-3 px-4 font-medium flex items-center justify-center gap-2 transition-colors ${
+              activeTab === 'seatplan'
+                ? 'border-b-2 border-blue-600 text-blue-600 bg-blue-50'
+                : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+            }`}
+          >
+            <LayoutGrid className="w-5 h-5" />
+            Seat Plan
+          </button>
         </div>
+      </div>
 
-        {/* Session Selector */}
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-            <label className="text-sm font-medium text-gray-700 whitespace-nowrap">
-              Select Active Session:
-            </label>
-            <select
-              value={selectedSession}
-              onChange={(e) => {
-                setSelectedSession(e.target.value)
-                const session = sessions.find(s => s.id === e.target.value)
-                setSelectedSessionDetails(session || null)
-                setStats(prev => ({ ...prev, activeSession: session || null }))
-                setIsMarkingMode(false)
-                setAttendanceMode(null)
-                setSelectedStudentId(null)
-              }}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm md:text-base"
-            >
-              <option value="">Choose a session</option>
-              {sessions.map(session => (
-                <option key={session.id} value={session.id}>
-                  {session.admin_users?.full_name || 'Unknown'} - Grade {session.grade} - Section {session.section}
-                  {session.session_description && ` - ${session.session_description}`}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {selectedSessionDetails && selectedSessionDetails.session_description && (
-            <div className="mt-3 bg-blue-50 p-3 rounded-lg border border-blue-200">
-              <p className="text-sm text-gray-700">
-                <span className="font-medium">Session Description:</span> {selectedSessionDetails.session_description}
-              </p>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+              <Scan className="w-5 h-5 text-blue-600" />
             </div>
-          )}
+            <div>
+              <p className="text-sm text-gray-600">Today's Scans</p>
+              <p className="text-xl font-bold text-gray-800">{stats.todayScans}</p>
+            </div>
+          </div>
         </div>
 
-        {/* Main Content Area - Responsive */}
-        {activeTab === 'scanner' ? (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-                <h2 className="text-lg font-semibold text-gray-800">Camera Feed</h2>
-                <div className="flex flex-wrap items-center gap-2">
-                  {scannerActive ? (
-                    <span className="flex items-center gap-1 text-green-600 text-sm">
-                      <Zap className="w-4 h-4" />
-                      Camera Active
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1 text-gray-600 text-sm">
-                      <ZapOff className="w-4 h-4" />
-                      Camera Off
-                    </span>
-                  )}
-                  <button
-                    onClick={scannerActive ? stopCamera : startCamera}
-                    disabled={cameraPermission === false}
-                    className={`px-4 py-2 rounded-lg transition-colors text-sm ${
-                      scannerActive 
-                        ? 'bg-red-600 hover:bg-red-700 text-white'
-                        : 'bg-blue-600 hover:bg-blue-700 text-white'
-                    } ${cameraPermission === false ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    {scannerActive ? 'Stop Camera' : 'Start Camera'}
-                  </button>
-                </div>
-              </div>
-
-              <div className="relative w-full aspect-video bg-gray-900 rounded-lg overflow-hidden">
-                {cameraPermission === false ? (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-4 text-center">
-                    <CameraOff className="w-12 h-12 mb-4 opacity-50" />
-                    <p className="text-lg font-medium">Camera Access Denied</p>
-                    <p className="text-sm text-gray-400 mt-2">
-                      {cameraError || 'Please allow camera access'}
-                    </p>
-                  </div>
-                ) : (
-                  <>
-                    <video
-                      ref={videoRef}
-                      className="absolute inset-0 w-full h-full object-cover"
-                      muted
-                      playsInline
-                      autoPlay
-                    />
-                    <canvas ref={canvasRef} style={{ display: 'none' }} />
-                    
-                    <div className="absolute inset-0 border-4 border-blue-500/30 pointer-events-none">
-                      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-56 h-56">
-                        <div className="absolute top-0 left-0 w-12 h-12 border-t-4 border-l-4 border-blue-500"></div>
-                        <div className="absolute top-0 right-0 w-12 h-12 border-t-4 border-r-4 border-blue-500"></div>
-                        <div className="absolute bottom-0 left-0 w-12 h-12 border-b-4 border-l-4 border-blue-500"></div>
-                        <div className="absolute bottom-0 right-0 w-12 h-12 border-b-4 border-r-4 border-blue-500"></div>
-                      </div>
-                    </div>
-
-                    {scannerActive && scanning && (
-                      <div className="absolute inset-0 pointer-events-none">
-                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent animate-scan"></div>
-                      </div>
-                    )}
-
-                    {(isProcessingQR || isProcessing) && (
-                      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center z-50">
-                        <div className="relative">
-                          <div className="w-20 h-20 border-4 border-blue-500/30 rounded-full animate-ping absolute"></div>
-                          <div className="w-20 h-20 border-4 border-t-blue-500 border-r-blue-500 border-b-transparent border-l-transparent rounded-full animate-spin"></div>
-                        </div>
-                        <p className="text-white font-medium mt-4 text-lg">{processingMessage || 'Processing QR Code...'}</p>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-
-              <p className="text-xs md:text-sm text-gray-500 mt-4 text-center">
-                Position the QR code within the frame to scan automatically
-              </p>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
+              <CheckCircle className="w-5 h-5 text-green-600" />
             </div>
-
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">Scan Results</h2>
-              
-              {scanResult ? (
-                <div className={`p-4 rounded-lg ${
-                  scanResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
-                }`}>
-                  <div className="flex items-start gap-3">
-                    {scanResult.success ? (
-                      scanResult.isEncrypted ? (
-                        <Lock className="w-6 h-6 text-green-600 shrink-0" />
-                      ) : (
-                        <CheckCircle className="w-6 h-6 text-green-600 shrink-0" />
-                      )
-                    ) : (
-                      <XCircle className="w-6 h-6 text-red-600 shrink-0" />
-                    )}
-                    <div className="flex-1">
-                      <p className={`font-medium ${
-                        scanResult.success ? 'text-green-800' : 'text-red-800'
-                      }`}>
-                        {scanResult.success ? 'Attendance Marked' : 'Scan Failed'}
-                        {scanResult.isEncrypted && scanResult.success && (
-                          <span className="ml-2 inline-flex items-center gap-1 text-xs bg-green-200 text-green-800 px-2 py-0.5 rounded-full">
-                            <Lock className="w-3 h-3" />
-                            Encrypted
-                          </span>
-                        )}
-                      </p>
-                      <p className={`text-sm mt-1 ${
-                        scanResult.success ? 'text-green-600' : 'text-red-600'
-                      }`}>
-                        {scanResult.message}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-8 md:py-12">
-                  <div className="w-16 h-16 md:w-20 md:h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <QrCode className="w-8 h-8 md:w-10 md:h-10 text-gray-400" />
-                  </div>
-                  <p className="text-gray-600">No scans yet</p>
-                  <p className="text-xs md:text-sm text-gray-500 mt-2">
-                    {scannerActive 
-                      ? 'Scan a student QR code to see results here'
-                      : 'Start the camera to begin scanning'}
-                  </p>
-                </div>
-              )}
+            <div>
+              <p className="text-sm text-gray-600">Present</p>
+              <p className="text-xl font-bold text-green-600">{stats.presentCount}</p>
             </div>
           </div>
-        ) : (
-          // Seat Plan View
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden" ref={seatPlanRef}>
-            {/* Attendance Toolbar */}
-            <div className="border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white p-4 md:p-6">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-lg md:text-xl font-semibold text-gray-800 flex items-center gap-2">
-                    <Grid className="w-5 h-5 text-blue-600" />
-                    Classroom Seat Plan
-                  </h2>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {isMarkingMode 
-                      ? `✓ Marking: ${attendanceMode?.toUpperCase()} mode. Click on any student card.`
-                      : 'Select a mode (Present/Late/Absent), then click on student cards to mark attendance.'}
-                  </p>
-                </div>
-                
-                {/* Download Button */}
-                {seatArrangement.length > 0 && (
-                  <button
-                    onClick={downloadSeatPlan}
-                    disabled={downloadingSeatPlan}
-                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm text-sm md:text-base"
-                  >
-                    {downloadingSeatPlan ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Printer className="w-4 h-4" />
-                    )}
-                    Print Seat Plan
-                  </button>
-                )}
-              </div>
+        </div>
 
-              {/* Color Legend */}
-              <div className="mt-4 flex flex-wrap items-center gap-4 text-xs md:text-sm">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                  <span>Present</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                  <span>Late</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                  <span>Absent</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 bg-gray-300 rounded-full"></div>
-                  <span>Not Marked</span>
-                </div>
-              </div>
-
-              {/* Attendance Mode Buttons */}
-              <div className="mt-5 flex flex-wrap gap-3">
-                <button
-                  onClick={() => {
-                    setIsMarkingMode(true)
-                    setAttendanceMode('present')
-                    setSelectedStudentId(null)
-                  }}
-                  className={`flex-1 sm:flex-none px-4 md:px-6 py-2 md:py-3 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2 text-sm md:text-base ${
-                    isMarkingMode && attendanceMode === 'present'
-                      ? 'bg-green-600 text-white shadow-lg shadow-green-200 ring-2 ring-green-500 ring-offset-2'
-                      : 'bg-green-100 text-green-700 hover:bg-green-200 hover:shadow-md'
-                  }`}
-                >
-                  <CheckCircle className="w-4 h-4 md:w-5 md:h-5" />
-                  Mark Present
-                  {isMarkingMode && attendanceMode === 'present' && (
-                    <span className="ml-2 text-xs bg-green-700 px-2 py-0.5 rounded-full">ACTIVE</span>
-                  )}
-                </button>
-                <button
-                  onClick={() => {
-                    setIsMarkingMode(true)
-                    setAttendanceMode('late')
-                    setSelectedStudentId(null)
-                  }}
-                  className={`flex-1 sm:flex-none px-4 md:px-6 py-2 md:py-3 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2 text-sm md:text-base ${
-                    isMarkingMode && attendanceMode === 'late'
-                      ? 'bg-yellow-600 text-white shadow-lg shadow-yellow-200 ring-2 ring-yellow-500 ring-offset-2'
-                      : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200 hover:shadow-md'
-                  }`}
-                >
-                  <Clock className="w-4 h-4 md:w-5 md:h-5" />
-                  Mark Late
-                  {isMarkingMode && attendanceMode === 'late' && (
-                    <span className="ml-2 text-xs bg-yellow-700 px-2 py-0.5 rounded-full">ACTIVE</span>
-                  )}
-                </button>
-                <button
-                  onClick={() => {
-                    setIsMarkingMode(true)
-                    setAttendanceMode('absent')
-                    setSelectedStudentId(null)
-                  }}
-                  className={`flex-1 sm:flex-none px-4 md:px-6 py-2 md:py-3 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2 text-sm md:text-base ${
-                    isMarkingMode && attendanceMode === 'absent'
-                      ? 'bg-red-600 text-white shadow-lg shadow-red-200 ring-2 ring-red-500 ring-offset-2'
-                      : 'bg-red-100 text-red-700 hover:bg-red-200 hover:shadow-md'
-                  }`}
-                >
-                  <XCircle className="w-4 h-4 md:w-5 md:h-5" />
-                  Mark Absent
-                  {isMarkingMode && attendanceMode === 'absent' && (
-                    <span className="ml-2 text-xs bg-red-700 px-2 py-0.5 rounded-full">ACTIVE</span>
-                  )}
-                </button>
-                
-                {isMarkingMode && (
-                  <button
-                    onClick={() => {
-                      setIsMarkingMode(false)
-                      setAttendanceMode(null)
-                      setSelectedStudentId(null)
-                    }}
-                    className="px-4 md:px-6 py-2 md:py-3 rounded-xl font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 transition-all duration-200 flex items-center gap-2 text-sm md:text-base"
-                  >
-                    <XCircle className="w-4 h-4 md:w-5 h-5" />
-                    Cancel Mode
-                  </button>
-                )}
-              </div>
-
-              {!isMarkingMode && (
-                <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                  <div className="flex items-center gap-2 text-sm text-blue-700">
-                    <MousePointer className="w-4 h-4" />
-                    <span>Select a mode above, then click on any student card to mark attendance instantly.</span>
-                  </div>
-                </div>
-              )}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-yellow-100 flex items-center justify-center">
+              <Clock className="w-5 h-5 text-yellow-600" />
             </div>
-
-            {/* Seat Plan Grid - Larger Cards, Responsive */}
-            <div className="p-4 md:p-6">
-              {sectionStudents.length === 0 ? (
-                <div className="text-center py-12">
-                  <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600">No students in this section</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-5">
-                  {seatArrangement.map((student, index) => {
-                    const status = studentAttendanceStatus[student.id]
-                    const isMarked = !!status
-                    const displayName = getSimplifiedName(student)
-                    const isSelected = selectedStudentId === student.id
-                    
-                    return (
-                      <div
-                        key={student.id}
-                        onClick={() => handleStudentCardClick(student.id)}
-                        className={`relative group rounded-xl border-2 transition-all duration-200 cursor-pointer ${
-                          isMarked
-                            ? status === 'present'
-                              ? 'bg-gradient-to-br from-green-50 to-green-100 border-green-400 shadow-md'
-                              : status === 'late'
-                              ? 'bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-400 shadow-md'
-                              : 'bg-gradient-to-br from-red-50 to-red-100 border-red-400 shadow-md'
-                            : isSelected
-                            ? 'border-blue-400 bg-blue-50 shadow-md ring-2 ring-blue-300'
-                            : 'border-gray-200 bg-white hover:border-blue-300 hover:shadow-lg'
-                        } ${isMarkingMode && attendanceMode && !isMarked ? 'hover:scale-105 transition-transform' : ''}`}
-                      >
-                        {/* Seat Number Badge */}
-                        <div className="absolute -top-3 -left-3 w-7 h-7 md:w-8 md:h-8 rounded-full bg-gradient-to-br from-gray-700 to-gray-800 text-white text-xs md:text-sm font-bold flex items-center justify-center shadow-lg">
-                          {index + 1}
-                        </div>
-                        
-                        <div className="p-3 md:p-4 pt-5 md:pt-6">
-                          <div className="text-center">
-                            <p className="font-bold text-gray-800 text-sm md:text-base leading-tight">
-                              {displayName}
-                            </p>
-                          </div>
-                          
-                          {/* Status Indicator - Large Badge */}
-                          {isMarked && (
-                            <div className="mt-3 md:mt-4 pt-2 md:pt-3 border-t border-current border-opacity-20">
-                              <div className={`text-center py-1.5 px-2 rounded-lg ${
-                                status === 'present' ? 'bg-green-200 text-green-800' :
-                                status === 'late' ? 'bg-yellow-200 text-yellow-800' :
-                                'bg-red-200 text-red-800'
-                              }`}>
-                                <span className="text-xs md:text-sm font-bold uppercase tracking-wide">
-                                  {status}
-                                </span>
-                              </div>
-                            </div>
-                          )}
-                          
-                          {/* Hover instruction for marking mode */}
-                          {isMarkingMode && attendanceMode && !isMarked && (
-                            <div className="absolute inset-0 bg-black/70 rounded-xl flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Fingerprint className="w-6 h-6 md:w-8 md:h-8 text-white mb-1 md:mb-2" />
-                              <p className="text-white text-xs md:text-sm font-medium">Click to mark</p>
-                              <p className="text-white text-xs capitalize mt-1">{attendanceMode}</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-              
-              {/* Summary Stats */}
-              {sectionStudents.length > 0 && (
-                <div className="mt-6 md:mt-8 pt-6 border-t border-gray-200">
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                    <div className="bg-blue-50 rounded-lg p-3 text-center">
-                      <p className="text-xs text-gray-600">Total Students</p>
-                      <p className="text-xl md:text-2xl font-bold text-blue-600 mt-1">{sectionStudents.length}</p>
-                    </div>
-                    <div className="bg-green-50 rounded-lg p-3 text-center">
-                      <p className="text-xs text-gray-600">Present</p>
-                      <p className="text-xl md:text-2xl font-bold text-green-600 mt-1">{stats.presentCount}</p>
-                    </div>
-                    <div className="bg-yellow-50 rounded-lg p-3 text-center">
-                      <p className="text-xs text-gray-600">Late</p>
-                      <p className="text-xl md:text-2xl font-bold text-yellow-600 mt-1">{stats.lateCount}</p>
-                    </div>
-                    <div className="bg-red-50 rounded-lg p-3 text-center">
-                      <p className="text-xs text-gray-600">Absent</p>
-                      <p className="text-xl md:text-2xl font-bold text-red-600 mt-1">{stats.absentCount}</p>
-                    </div>
-                    <div className="bg-purple-50 rounded-lg p-3 text-center">
-                      <p className="text-xs text-gray-600">Completion</p>
-                      <p className="text-xl md:text-2xl font-bold text-purple-600 mt-1">
-                        {Math.round(((stats.presentCount + stats.lateCount + stats.absentCount) / sectionStudents.length) * 100)}%
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
+            <div>
+              <p className="text-sm text-gray-600">Late</p>
+              <p className="text-xl font-bold text-yellow-600">{stats.lateCount}</p>
             </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center">
+              <XCircle className="w-5 h-5 text-red-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Absent</p>
+              <p className="text-xl font-bold text-red-600">{stats.absentCount}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Session Selector */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+          <label className="text-sm font-medium text-gray-700 whitespace-nowrap">
+            Select Active Session:
+          </label>
+          <select
+            value={selectedSession}
+            onChange={(e) => {
+              setSelectedSession(e.target.value)
+              const session = sessions.find(s => s.id === e.target.value)
+              setSelectedSessionDetails(session || null)
+              setStats(prev => ({ ...prev, activeSession: session || null }))
+              // Reset marking mode when session changes
+              setIsMarkingMode(false)
+              setAttendanceMode(null)
+              setSelectedStudentId(null)
+            }}
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+          >
+            <option value="">Choose a session</option>
+            {sessions.map(session => (
+              <option key={session.id} value={session.id}>
+                {session.admin_users?.full_name || 'Unknown'} - Grade {session.grade} - Section {session.section}
+                {session.session_description && ` - ${session.session_description}`}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {selectedSessionDetails && selectedSessionDetails.session_description && (
+          <div className="mt-3 bg-blue-50 p-3 rounded-lg border border-blue-200">
+            <p className="text-sm text-gray-700">
+              <span className="font-medium">Session Description:</span> {selectedSessionDetails.session_description}
+            </p>
           </div>
         )}
+      </div>
 
-        {/* Info Footer */}
-        <div className="bg-blue-50 rounded-xl p-4 md:p-6 border border-blue-200">
-          <div className="flex items-start gap-3">
-            <Shield className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-            <div>
-              <h3 className="font-medium text-blue-800 text-sm md:text-base">Secure Attendance System</h3>
-              <p className="text-xs md:text-sm text-blue-700 mt-1">
-                QR codes are encrypted end-to-end. Seat plan mode: select Present/Late/Absent, then click on student cards.
-                {activeTab === 'seatplan' && !isMarkingMode && " Select a mode above to start marking."}
-                You can also print the seat plan using the Print button above.
-              </p>
+      {/* Main Content Area */}
+      {activeTab === 'scanner' ? (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+              <h2 className="text-lg font-semibold text-gray-800">Camera Feed</h2>
+              <div className="flex flex-wrap items-center gap-2">
+                {scannerActive ? (
+                  <span className="flex items-center gap-1 text-green-600 text-sm">
+                    <Zap className="w-4 h-4" />
+                    Camera Active
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 text-gray-600 text-sm">
+                    <ZapOff className="w-4 h-4" />
+                    Camera Off
+                  </span>
+                )}
+                <button
+                  onClick={scannerActive ? stopCamera : startCamera}
+                  disabled={cameraPermission === false}
+                  className={`px-4 py-2 rounded-lg transition-colors ${
+                    scannerActive 
+                      ? 'bg-red-600 hover:bg-red-700 text-white'
+                      : 'bg-blue-600 hover:bg-blue-700 text-white'
+                  } ${cameraPermission === false ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {scannerActive ? 'Stop Camera' : 'Start Camera'}
+                </button>
+              </div>
             </div>
+
+            <div className="relative w-full aspect-video bg-gray-900 rounded-lg overflow-hidden">
+              {cameraPermission === false ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
+                  <CameraOff className="w-12 h-12 mb-4 opacity-50" />
+                  <p className="text-lg font-medium">Camera Access Denied</p>
+                  <p className="text-sm text-gray-400 mt-2 text-center px-4">
+                    {cameraError || 'Please allow camera access'}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <video
+                    ref={videoRef}
+                    className="absolute inset-0 w-full h-full object-cover"
+                    muted
+                    playsInline
+                    autoPlay
+                  />
+                  <canvas ref={canvasRef} style={{ display: 'none' }} />
+                  
+                  <div className="absolute inset-0 border-4 border-blue-500/30 pointer-events-none">
+                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-56 h-56">
+                      <div className="absolute top-0 left-0 w-12 h-12 border-t-4 border-l-4 border-blue-500"></div>
+                      <div className="absolute top-0 right-0 w-12 h-12 border-t-4 border-r-4 border-blue-500"></div>
+                      <div className="absolute bottom-0 left-0 w-12 h-12 border-b-4 border-l-4 border-blue-500"></div>
+                      <div className="absolute bottom-0 right-0 w-12 h-12 border-b-4 border-r-4 border-blue-500"></div>
+                    </div>
+                  </div>
+
+                  {scannerActive && scanning && (
+                    <div className="absolute inset-0 pointer-events-none">
+                      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent animate-scan"></div>
+                    </div>
+                  )}
+
+                  {(isProcessingQR || isProcessing) && (
+                    <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center z-50">
+                      <div className="relative">
+                        <div className="w-20 h-20 border-4 border-blue-500/30 rounded-full animate-ping absolute"></div>
+                        <div className="w-20 h-20 border-4 border-t-blue-500 border-r-blue-500 border-b-transparent border-l-transparent rounded-full animate-spin"></div>
+                      </div>
+                      <p className="text-white font-medium mt-4 text-lg">{processingMessage || 'Processing QR Code...'}</p>
+                      <p className="text-gray-300 text-sm mt-3">Please wait...</p>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            <p className="text-sm text-gray-500 mt-4 text-center">
+              Position the QR code within the frame to scan automatically
+            </p>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Scan Results</h2>
+            
+            {scanResult ? (
+              <div className={`p-4 rounded-lg ${
+                scanResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
+              }`}>
+                <div className="flex items-start gap-3">
+                  {scanResult.success ? (
+                    scanResult.isEncrypted ? (
+                      <Lock className="w-6 h-6 text-green-600 shrink-0" />
+                    ) : (
+                      <CheckCircle className="w-6 h-6 text-green-600 shrink-0" />
+                    )
+                  ) : (
+                    <XCircle className="w-6 h-6 text-red-600 shrink-0" />
+                  )}
+                  <div className="flex-1">
+                    <p className={`font-medium ${
+                      scanResult.success ? 'text-green-800' : 'text-red-800'
+                    }`}>
+                      {scanResult.success ? 'Attendance Marked' : 'Scan Failed'}
+                      {scanResult.isEncrypted && scanResult.success && (
+                        <span className="ml-2 inline-flex items-center gap-1 text-xs bg-green-200 text-green-800 px-2 py-0.5 rounded-full">
+                          <Lock className="w-3 h-3" />
+                          Encrypted
+                        </span>
+                      )}
+                    </p>
+                    <p className={`text-sm mt-1 ${
+                      scanResult.success ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {scanResult.message}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <QrCode className="w-10 h-10 text-gray-400" />
+                </div>
+                <p className="text-gray-600">No scans yet</p>
+                <p className="text-sm text-gray-500 mt-2">
+                  {scannerActive 
+                    ? 'Scan a student QR code to see results here'
+                    : 'Start the camera to begin scanning'}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        // Seat Plan View with Attendance Toolbar
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden" ref={seatPlanRef}>
+          {/* Attendance Toolbar */}
+          <div className="border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white p-5">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                  <Grid className="w-5 h-5 text-blue-600" />
+                  Classroom Seat Plan
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  {isMarkingMode 
+                    ? `✓ Marking: ${attendanceMode?.toUpperCase()} mode. Click on any student card.`
+                    : 'Select a mode (Present/Late/Absent), then click on student cards to mark attendance.'}
+                </p>
+              </div>
+              
+              {/* Download Button */}
+              {seatArrangement.length > 0 && (
+                <button
+                  onClick={downloadSeatPlan}
+                  disabled={downloadingSeatPlan}
+                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
+                >
+                  {downloadingSeatPlan ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Printer className="w-4 h-4" />
+                  )}
+                  Print/Download Seat Plan
+                </button>
+              )}
+            </div>
+
+            {/* Color Legend */}
+            <div className="mt-4 flex flex-wrap items-center gap-4 text-xs">
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                <span>Present</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                <span>Late</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                <span>Absent</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 bg-gray-300 rounded-full"></div>
+                <span>Not Marked</span>
+              </div>
+            </div>
+
+            {/* Attendance Mode Buttons */}
+            <div className="mt-5 flex flex-wrap gap-3">
+              <button
+                onClick={() => {
+                  setIsMarkingMode(true)
+                  setAttendanceMode('present')
+                  setSelectedStudentId(null)
+                }}
+                className={`flex-1 sm:flex-none px-6 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2 ${
+                  isMarkingMode && attendanceMode === 'present'
+                    ? 'bg-green-600 text-white shadow-lg shadow-green-200 ring-2 ring-green-500 ring-offset-2'
+                    : 'bg-green-100 text-green-700 hover:bg-green-200 hover:shadow-md'
+                }`}
+              >
+                <CheckCircle className="w-5 h-5" />
+                Mark Present
+                {isMarkingMode && attendanceMode === 'present' && (
+                  <span className="ml-2 text-xs bg-green-700 px-2 py-0.5 rounded-full">ACTIVE</span>
+                )}
+              </button>
+              <button
+                onClick={() => {
+                  setIsMarkingMode(true)
+                  setAttendanceMode('late')
+                  setSelectedStudentId(null)
+                }}
+                className={`flex-1 sm:flex-none px-6 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2 ${
+                  isMarkingMode && attendanceMode === 'late'
+                    ? 'bg-yellow-600 text-white shadow-lg shadow-yellow-200 ring-2 ring-yellow-500 ring-offset-2'
+                    : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200 hover:shadow-md'
+                }`}
+              >
+                <Clock className="w-5 h-5" />
+                Mark Late
+                {isMarkingMode && attendanceMode === 'late' && (
+                  <span className="ml-2 text-xs bg-yellow-700 px-2 py-0.5 rounded-full">ACTIVE</span>
+                )}
+              </button>
+              <button
+                onClick={() => {
+                  setIsMarkingMode(true)
+                  setAttendanceMode('absent')
+                  setSelectedStudentId(null)
+                }}
+                className={`flex-1 sm:flex-none px-6 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2 ${
+                  isMarkingMode && attendanceMode === 'absent'
+                    ? 'bg-red-600 text-white shadow-lg shadow-red-200 ring-2 ring-red-500 ring-offset-2'
+                    : 'bg-red-100 text-red-700 hover:bg-red-200 hover:shadow-md'
+                }`}
+              >
+                <XCircle className="w-5 h-5" />
+                Mark Absent
+                {isMarkingMode && attendanceMode === 'absent' && (
+                  <span className="ml-2 text-xs bg-red-700 px-2 py-0.5 rounded-full">ACTIVE</span>
+                )}
+              </button>
+              
+              {isMarkingMode && (
+                <button
+                  onClick={() => {
+                    setIsMarkingMode(false)
+                    setAttendanceMode(null)
+                    setSelectedStudentId(null)
+                  }}
+                  className="px-6 py-3 rounded-xl font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 transition-all duration-200 flex items-center gap-2"
+                >
+                  <XCircle className="w-5 h-5" />
+                  Cancel Mode
+                </button>
+              )}
+            </div>
+
+            {!isMarkingMode && (
+              <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="flex items-center gap-2 text-sm text-blue-700">
+                  <MousePointer className="w-4 h-4" />
+                  <span>Select a mode above, then click on any student card to mark attendance instantly.</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Seat Plan Grid - Larger Cards */}
+          <div className="p-6">
+            {sectionStudents.length === 0 ? (
+              <div className="text-center py-12">
+                <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600">No students in this section</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
+                {seatArrangement.map((student, index) => {
+                  const status = studentAttendanceStatus[student.id]
+                  const isMarked = !!status
+                  const displayName = getSimplifiedName(student)
+                  const isSelected = selectedStudentId === student.id
+                  
+                  return (
+                    <div
+                      key={student.id}
+                      onClick={() => handleStudentCardClick(student.id)}
+                      className={`relative group rounded-xl border-2 transition-all duration-200 cursor-pointer ${
+                        isMarked
+                          ? status === 'present'
+                            ? 'bg-gradient-to-br from-green-50 to-green-100 border-green-400 shadow-md'
+                            : status === 'late'
+                            ? 'bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-400 shadow-md'
+                            : 'bg-gradient-to-br from-red-50 to-red-100 border-red-400 shadow-md'
+                          : isSelected
+                          ? 'border-blue-400 bg-blue-50 shadow-md ring-2 ring-blue-300'
+                          : 'border-gray-200 bg-white hover:border-blue-300 hover:shadow-lg'
+                      } ${isMarkingMode && attendanceMode && !isMarked ? 'hover:scale-105 transition-transform' : ''}`}
+                    >
+                      {/* Seat Number Badge */}
+                      <div className="absolute -top-3 -left-3 w-8 h-8 rounded-full bg-gradient-to-br from-gray-700 to-gray-800 text-white text-sm font-bold flex items-center justify-center shadow-lg">
+                        {index + 1}
+                      </div>
+                      
+                      <div className="p-4 pt-6">
+                        <div className="text-center">
+                          <p className="font-bold text-gray-800 text-base leading-tight">
+                            {displayName}
+                          </p>
+                        </div>
+                        
+                        {/* Status Indicator - Large Badge */}
+                        {isMarked && (
+                          <div className="mt-4 pt-3 border-t border-current border-opacity-20">
+                            <div className={`text-center py-1.5 px-2 rounded-lg ${
+                              status === 'present' ? 'bg-green-200 text-green-800' :
+                              status === 'late' ? 'bg-yellow-200 text-yellow-800' :
+                              'bg-red-200 text-red-800'
+                            }`}>
+                              <span className="text-xs font-bold uppercase tracking-wide">
+                                {status}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Empty state placeholder for unmarked */}
+                        {!isMarked && isMarkingMode && attendanceMode && (
+                          <div className="mt-4 pt-3 text-center">
+                            <div className="text-xs text-gray-400 italic">Click to mark</div>
+                          </div>
+                        )}
+                        
+                        {/* Hover instruction for marking mode */}
+                        {isMarkingMode && attendanceMode && !isMarked && (
+                          <div className="absolute inset-0 bg-black/70 rounded-xl flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Fingerprint className="w-8 h-8 text-white mb-2" />
+                            <p className="text-white text-sm font-medium">Click to mark</p>
+                            <p className="text-white text-xs capitalize mt-1">{attendanceMode}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+            
+            {/* Summary Stats */}
+            {sectionStudents.length > 0 && (
+              <div className="mt-8 pt-6 border-t border-gray-200">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                  <div className="bg-blue-50 rounded-lg p-3 text-center">
+                    <p className="text-xs text-gray-600">Total Students</p>
+                    <p className="text-2xl font-bold text-blue-600 mt-1">{sectionStudents.length}</p>
+                  </div>
+                  <div className="bg-green-50 rounded-lg p-3 text-center">
+                    <p className="text-xs text-gray-600">Present</p>
+                    <p className="text-2xl font-bold text-green-600 mt-1">{stats.presentCount}</p>
+                  </div>
+                  <div className="bg-yellow-50 rounded-lg p-3 text-center">
+                    <p className="text-xs text-gray-600">Late</p>
+                    <p className="text-2xl font-bold text-yellow-600 mt-1">{stats.lateCount}</p>
+                  </div>
+                  <div className="bg-red-50 rounded-lg p-3 text-center">
+                    <p className="text-xs text-gray-600">Absent</p>
+                    <p className="text-2xl font-bold text-red-600 mt-1">{stats.absentCount}</p>
+                  </div>
+                  <div className="bg-purple-50 rounded-lg p-3 text-center">
+                    <p className="text-xs text-gray-600">Completion</p>
+                    <p className="text-2xl font-bold text-purple-600 mt-1">
+                      {Math.round(((stats.presentCount + stats.lateCount + stats.absentCount) / sectionStudents.length) * 100)}%
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="bg-blue-50 rounded-xl p-4 sm:p-6 border border-blue-200">
+        <div className="flex items-start gap-3">
+          <Shield className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+          <div>
+            <h3 className="font-medium text-blue-800">Secure Attendance System</h3>
+            <p className="text-sm text-blue-700 mt-1">
+              QR codes are encrypted end-to-end. Seat plan mode: select Present/Late/Absent, then click on student cards.
+              {activeTab === 'seatplan' && !isMarkingMode && " Select a mode above to start marking."}
+              You can also print or download the seat plan using the button above.
+            </p>
           </div>
         </div>
       </div>
