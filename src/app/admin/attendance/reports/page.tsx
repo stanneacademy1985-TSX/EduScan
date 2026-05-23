@@ -68,6 +68,7 @@ interface AttendanceRecord {
   students: {
     lrn: string
     first_name: string
+    middle_name: string
     last_name: string
     full_name: string
     grade: string
@@ -79,6 +80,9 @@ interface AttendanceRecord {
 interface Student {
   id: string
   lrn: string
+  first_name: string
+  middle_name: string
+  last_name: string
   full_name: string
   grade: string
   section: string
@@ -128,6 +132,48 @@ interface ReportSummary {
   presentCount: number
   lateCount: number
   absentCount: number
+}
+
+// Helper function to capitalize first letter of each word
+const capitalizeName = (name: string): string => {
+  if (!name) return ''
+  return name
+    .toLowerCase()
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+}
+
+// Format student full name for display
+const formatStudentName = (firstName: string, middleName: string | null, lastName: string): string => {
+  const first = capitalizeName(firstName || '')
+  const last = capitalizeName(lastName || '')
+  
+  if (!first && !last) return 'Unknown Student'
+  
+  if (middleName && middleName.trim()) {
+    const middleInitial = middleName.trim().charAt(0).toUpperCase()
+    return `${first} ${middleInitial}. ${last}`
+  }
+  return `${first} ${last}`.trim()
+}
+
+// Format teacher name from full_name field
+const formatTeacherName = (fullName: string): string => {
+  if (!fullName) return 'Unknown Teacher'
+  
+  const nameParts = fullName.trim().split(/\s+/)
+  if (nameParts.length === 1) {
+    return capitalizeName(nameParts[0])
+  } else if (nameParts.length === 2) {
+    return `${capitalizeName(nameParts[0])} ${capitalizeName(nameParts[1])}`
+  } else if (nameParts.length >= 3) {
+    const firstName = capitalizeName(nameParts[0])
+    const middleInitial = nameParts[1].charAt(0).toUpperCase()
+    const lastName = capitalizeName(nameParts[nameParts.length - 1])
+    return `${firstName} ${middleInitial}. ${lastName}`
+  }
+  return capitalizeName(fullName)
 }
 
 export default function AttendanceReportsPage() {
@@ -271,9 +317,9 @@ export default function AttendanceReportsPage() {
 
       let studentsQuery = supabase
         .from('students')
-        .select('id, lrn, full_name, grade, section, profile_photo_base64')
+        .select('id, lrn, first_name, middle_name, last_name, full_name, grade, section, profile_photo_base64')
         .in('grade', ['11', '12'])
-        .order('full_name')
+        .order('first_name')
 
       if (assignedStudentIds !== null) {
         studentsQuery = studentsQuery.in('id', assignedStudentIds)
@@ -285,7 +331,12 @@ export default function AttendanceReportsPage() {
       const { data: studentsData, error: studentsError } = await studentsQuery
 
       if (studentsError) throw studentsError
-      setStudents(studentsData || [])
+      
+      const formattedStudents = (studentsData || []).map((student: any) => ({
+        ...student,
+        full_name: formatStudentName(student.first_name, student.middle_name, student.last_name)
+      }))
+      setStudents(formattedStudents)
 
       let teachersQuery = supabase
         .from('admin_users')
@@ -308,6 +359,7 @@ export default function AttendanceReportsPage() {
           students (
             lrn,
             first_name,
+            middle_name,
             last_name,
             full_name,
             grade,
@@ -338,7 +390,7 @@ export default function AttendanceReportsPage() {
         if (!record.teacher_name || record.teacher_name === 'Unknown' || record.teacher_name === 'Unknown Teacher') {
           const teacher = teachersData?.find(t => t.id === record.teacher_id)
           if (teacher) {
-            return { ...record, teacher_name: teacher.full_name }
+            return { ...record, teacher_name: formatTeacherName(teacher.full_name) }
           }
         }
         return record
@@ -347,7 +399,17 @@ export default function AttendanceReportsPage() {
       const gradeRestrictedAttendance = (attendanceWithTeacherNames || []).filter(
         (record) => record.students?.grade === '11' || record.students?.grade === '12'
       )
-      setAttendanceData(gradeRestrictedAttendance)
+      
+      // Format student names in attendance records
+      const formattedAttendance = gradeRestrictedAttendance.map((record: any) => ({
+        ...record,
+        students: record.students ? {
+          ...record.students,
+          full_name: formatStudentName(record.students.first_name, record.students.middle_name, record.students.last_name)
+        } : null
+      }))
+      
+      setAttendanceData(formattedAttendance)
 
     } catch (error) {
       console.error('Error fetching data:', error)
@@ -418,7 +480,7 @@ export default function AttendanceReportsPage() {
     })
     
     const mostActiveGrade = Object.entries(gradeCounts)
-      .sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/l'
+      .sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A'
 
     const studentCounts: { [key: string]: { name: string, count: number } } = {}
     data.forEach(record => {
@@ -432,7 +494,7 @@ export default function AttendanceReportsPage() {
     })
     
     const topPerformer = Object.values(studentCounts)
-      .sort((a, b) => b.count - a.count)[0]?.name || 'N/l'
+      .sort((a, b) => b.count - a.count)[0]?.name || 'N/A'
 
     setSummary({
       totalStudents,
@@ -495,14 +557,14 @@ export default function AttendanceReportsPage() {
       let totalPresent = 0
       let totalLate = 0
       let totalAbsent = 0
-      let totalHessions = 0
+      let totalSessions = 0
 
       students.forEach(student => {
         student.attendance_rate = Math.round((student.present / student.total_sessions) * 100)
         totalPresent += student.present
         totalLate += student.late
         totalAbsent += student.absent
-        totalHessions += student.total_sessions
+        totalSessions += student.total_sessions
       })
 
       students.sort((a, b) => a.student_name.localeCompare(b.student_name))
@@ -512,8 +574,8 @@ export default function AttendanceReportsPage() {
 
       summaries.push({
         teacher_id: teacherId,
-        teacher_name: teacher?.full_name || 'Unknown',
-        total_sessions: totalHessions,
+        teacher_name: teacher ? formatTeacherName(teacher.full_name) : 'Unknown',
+        total_sessions: totalSessions,
         total_students: students.length,
         students: students,
         present_count: totalPresent,
@@ -527,7 +589,7 @@ export default function AttendanceReportsPage() {
     setTeacherHummaries(summaries)
   }
 
-  const parseTimeInHeconds = (time: string) => {
+  const parseTimeInSeconds = (time: string) => {
     const parts = time.split(':').map(Number)
     if (parts.length !== 3) return 0
     return parts[0] * 3600 + parts[1] * 60 + parts[2]
@@ -545,11 +607,11 @@ export default function AttendanceReportsPage() {
     }, {} as Record<string, AttendanceRecord[]>)
 
     Object.values(grouped).forEach(bucket => {
-      const sorted = [...bucket].sort((a, b) => parseTimeInHeconds(a.time_in) - parseTimeInHeconds(b.time_in))
+      const sorted = [...bucket].sort((a, b) => parseTimeInSeconds(a.time_in) - parseTimeInSeconds(b.time_in))
       for (let i = 0; i < sorted.length - 1; i++) {
         const current = sorted[i]
         const next = sorted[i + 1]
-        const deltaSeconds = Math.abs(parseTimeInHeconds(next.time_in) - parseTimeInHeconds(current.time_in))
+        const deltaSeconds = Math.abs(parseTimeInSeconds(next.time_in) - parseTimeInSeconds(current.time_in))
         if (current.student_id !== next.student_id && deltaSeconds <= 15) {
           pockets.push({
             date: current.date,
@@ -650,7 +712,7 @@ export default function AttendanceReportsPage() {
       setAiAdvancedAnomalies(payload.advancedAnomalies || payload.advancedlnomalies || [])
       setAiExternalFactors(payload.externalFactors || [])
     } catch (error) {
-      console.error('lI analytics error', error)
+      console.error('AI analytics error', error)
     } finally {
       setAiAnalyticsLoading(false)
     }
@@ -666,12 +728,12 @@ export default function AttendanceReportsPage() {
     setExpandedTeachers(newExpanded)
   }
 
-  const expandlll = () => {
+  const expandAll = () => {
     const allTeacherIds = teacherHummaries.map(t => t.teacher_id)
     setExpandedTeachers(new Set(allTeacherIds))
   }
 
-  const collapselll = () => {
+  const collapseAll = () => {
     setExpandedTeachers(new Set())
   }
 
@@ -783,11 +845,11 @@ export default function AttendanceReportsPage() {
 
         const studentColumns = [
           { header: 'Student', dataKey: 'name' },
-          { header: 'Grade/Hec', dataKey: 'grade' },
-          { header: 'Hess', dataKey: 'sessions' },
+          { header: 'Grade/Sec', dataKey: 'grade' },
+          { header: 'Sessions', dataKey: 'sessions' },
           { header: 'P', dataKey: 'present' },
           { header: 'L', dataKey: 'late' },
-          { header: 'l', dataKey: 'absent' },
+          { header: 'A', dataKey: 'absent' },
           { header: 'Rate', dataKey: 'rate' }
         ]
 
@@ -823,50 +885,56 @@ export default function AttendanceReportsPage() {
     }
   }
 
-const handleExportExcel = () => {
-  try {
-    setExporting(true)
+  const handleExportExcel = () => {
+    try {
+      setExporting(true)
 
-    const workbook = XLSX.utils.book_new()
+      const workbook = XLSX.utils.book_new()
 
-    // Prepare student data for all teachers
-    const studentRows: any[] = []
+      const studentRows: any[] = []
 
-    teacherHummaries.forEach(teacher => {
-      teacher.students.forEach(student => {
-        studentRows.push({
-          Name: student.student_name,
-          Grade: student.grade,
-          Sessions: student.total_sessions,
-          Present: student.present,
-          Late: student.late,
-          Absent: student.absent
+      teacherHummaries.forEach(teacher => {
+        teacher.students.forEach(student => {
+          studentRows.push({
+            Name: student.student_name,
+            Grade: student.grade,
+            Section: student.section,
+            LRN: `="${student.lrn}"`,
+            Sessions: student.total_sessions,
+            Present: student.present,
+            Late: student.late,
+            Absent: student.absent,
+            Rate: `${student.attendance_rate}%`,
+            Teacher: teacher.teacher_name
+          })
         })
       })
-    })
 
-    // Sort by Name
-    studentRows.sort((a, b) => a.Name.localeCompare(b.Name))
+      studentRows.sort((a, b) => a.Name.localeCompare(b.Name))
 
-    const studentSheet = XLSX.utils.json_to_sheet(studentRows)
-    studentSheet['!cols'] = [
-      { wch: 35 }, // Name
-      { wch: 10 }, // Grade
-      { wch: 12 }, // Sessions
-      { wch: 10 }, // Present
-      { wch: 8 },  // Late
-      { wch: 10 }  // Absent
-    ]
+      const studentSheet = XLSX.utils.json_to_sheet(studentRows)
+      studentSheet['!cols'] = [
+        { wch: 35 }, // Name
+        { wch: 10 }, // Grade
+        { wch: 15 }, // Section
+        { wch: 15 }, // LRN
+        { wch: 12 }, // Sessions
+        { wch: 10 }, // Present
+        { wch: 8 },  // Late
+        { wch: 10 }, // Absent
+        { wch: 8 },  // Rate
+        { wch: 30 }  // Teacher
+      ]
 
-    XLSX.utils.book_append_sheet(workbook, studentSheet, 'Students Attendance')
+      XLSX.utils.book_append_sheet(workbook, studentSheet, 'Students Attendance')
 
-    XLSX.writeFile(workbook, `attendance_report_${dateRange.start}_to_${dateRange.end}.xlsx`)
-  } catch (error) {
-    console.error('Error exporting Excel:', error)
-  } finally {
-    setExporting(false)
+      XLSX.writeFile(workbook, `attendance_report_${dateRange.start}_to_${dateRange.end}.xlsx`)
+    } catch (error) {
+      console.error('Error exporting Excel:', error)
+    } finally {
+      setExporting(false)
+    }
   }
-}
 
   const handleClearAttendance = async () => {
     try {
@@ -887,12 +955,12 @@ const handleExportExcel = () => {
             }
           }
           if (selectedTeacher !== 'all') {
-            const { data: teacherHessions } = await supabase
+            const { data: teacherSessions } = await supabase
               .from('attendance_sessions')
               .select('id')
               .eq('teacher_id', selectedTeacher)
             
-            const sessionIds = teacherHessions?.map(s => s.id) || []
+            const sessionIds = teacherSessions?.map(s => s.id) || []
             if (sessionIds.length > 0) {
               query = query.in('session_id', sessionIds)
             } else {
@@ -911,12 +979,12 @@ const handleExportExcel = () => {
 
         case 'teacher':
           if (clearTeacher) {
-            const { data: teacherHessions } = await supabase
+            const { data: teacherSessions } = await supabase
               .from('attendance_sessions')
               .select('id')
               .eq('teacher_id', clearTeacher)
             
-            const sessionIds = teacherHessions?.map(s => s.id) || []
+            const sessionIds = teacherSessions?.map(s => s.id) || []
             if (sessionIds.length > 0) {
               query = query.in('session_id', sessionIds)
             } else {
@@ -980,7 +1048,7 @@ const handleExportExcel = () => {
     <div className="min-h-screen bg-linear-to-br from-slate-50 via-white to-indigo-50/30 p-3 sm:p-6">
       <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6 pb-10">
         
-        {/* Header with Modern Glass Morphism - Fully Responsive */}
+        {/* Header with Modern Glass Morphism */}
         <div className="relative overflow-visible bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/50">
           <div className="absolute -top-20 -right-20 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl"></div>
           <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-purple-500/20 rounded-full blur-3xl"></div>
@@ -1060,7 +1128,7 @@ const handleExportExcel = () => {
           </div>
         </div>
 
-        {/* Filters Section - Fully Responsive Grid */}
+        {/* Filters Section - Rest remains the same as original */}
         {showFilters && (
           <div className="bg-white rounded-2xl shadow-lg border border-slate-100 p-4 sm:p-6 animate-in slide-in-from-top-4">
             <div className="flex flex-wrap items-center gap-2 mb-4 sm:mb-5 pb-2 border-b border-slate-100">
@@ -1098,7 +1166,7 @@ const handleExportExcel = () => {
                 </label>
                 <select value={selectedTeacher} onChange={(e) => setSelectedTeacher(e.target.value)} className="w-full px-2 sm:px-3 py-2 sm:py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-xs sm:text-sm truncate">
                   <option value="all">All Teachers</option>
-                  {teachers.map(teacher => <option key={teacher.id} value={teacher.id} className="truncate">{teacher.full_name}</option>)}
+                  {teachers.map(teacher => <option key={teacher.id} value={teacher.id} className="truncate">{formatTeacherName(teacher.full_name)}</option>)}
                 </select>
               </div>
             </div>
@@ -1128,21 +1196,10 @@ const handleExportExcel = () => {
                 </div>
               </div>
             </div>
-
-            {(selectedGrade !== 'all' || selectedTeacher !== 'all' || selectedStatus !== 'all' || searchTerm) && (
-              <div className="mt-4 sm:mt-5 pt-4 border-t border-slate-100 flex flex-wrap items-center gap-2">
-                <span className="text-xs text-slate-500 flex items-center gap-1"><Filter className="w-3 h-3" />Active:</span>
-                {selectedGrade !== 'all' && <span className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-xs border border-indigo-100">Grade {selectedGrade}</span>}
-                {selectedTeacher !== 'all' && <span className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-xs border border-indigo-100">Teacher</span>}
-                {selectedStatus !== 'all' && <span className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-xs border border-indigo-100 capitalize">{selectedStatus}</span>}
-                {searchTerm && <span className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-xs border border-indigo-100">"{searchTerm}"</span>}
-                <button onClick={() => { setSearchTerm(''); setSelectedGrade('all'); setSelectedTeacher('all'); setSelectedStatus('all'); }} className="px-2 py-1 text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">Clear</button>
-              </div>
-            )}
           </div>
         )}
 
-        {/* KPI Cards - Responsive Grid */}
+        {/* KPI Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-5">
           {[
             { title: 'Records', value: formatNumber(summary.totalAttendance), icon: FileText, color: 'from-blue-600 to-indigo-600', bg: 'bg-blue-50', textColor: 'text-blue-600' },
@@ -1167,7 +1224,7 @@ const handleExportExcel = () => {
           ))}
         </div>
 
-        {/* View Toggle - Responsive */}
+        {/* View Toggle */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 bg-white rounded-xl shadow-md p-3 sm:p-4 border border-slate-100">
           <div className="flex flex-wrap gap-2 p-1 bg-slate-100 rounded-xl w-full sm:w-auto">
             <button
@@ -1199,21 +1256,20 @@ const handleExportExcel = () => {
               <button
                 onClick={() => setChartSize(chartSize === 'normal' ? 'large' : 'normal')}
                 className="p-1.5 sm:p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-all"
-                title={chartSize === 'normal' ? 'Enlarge chart' : 'Normal size'}
               >
                 {chartSize === 'normal' ? <Maximize2 className="w-3 h-3 sm:w-4 sm:h-4" /> : <Minimize2 className="w-3 h-3 sm:w-4 sm:h-4" />}
               </button>
               <div className="flex gap-1 p-1 bg-slate-100 rounded-lg">
-                <button onClick={() => setChartType('pie')} className={`p-1.5 sm:p-2 rounded-lg transition-all ${chartType === 'pie' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600'}`} title="Pie Chart"><PieChart className="w-3 h-3 sm:w-4 sm:h-4" /></button>
-                <button onClick={() => setChartType('bar')} className={`p-1.5 sm:p-2 rounded-lg transition-all ${chartType === 'bar' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600'}`} title="Bar Chart"><BarChart3 className="w-3 h-3 sm:w-4 sm:h-4" /></button>
-                <button onClick={() => setChartType('line')} className={`p-1.5 sm:p-2 rounded-lg transition-all ${chartType === 'line' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600'}`} title="Line Chart"><Activity className="w-3 h-3 sm:w-4 sm:h-4" /></button>
-                <button onClick={() => setChartType('area')} className={`p-1.5 sm:p-2 rounded-lg transition-all ${chartType === 'area' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600'}`} title="Area Chart"><TrendingUp className="w-3 h-3 sm:w-4 sm:h-4" /></button>
+                <button onClick={() => setChartType('pie')} className={`p-1.5 sm:p-2 rounded-lg transition-all ${chartType === 'pie' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600'}`}><PieChart className="w-3 h-3 sm:w-4 sm:h-4" /></button>
+                <button onClick={() => setChartType('bar')} className={`p-1.5 sm:p-2 rounded-lg transition-all ${chartType === 'bar' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600'}`}><BarChart3 className="w-3 h-3 sm:w-4 sm:h-4" /></button>
+                <button onClick={() => setChartType('line')} className={`p-1.5 sm:p-2 rounded-lg transition-all ${chartType === 'line' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600'}`}><Activity className="w-3 h-3 sm:w-4 sm:h-4" /></button>
+                <button onClick={() => setChartType('area')} className={`p-1.5 sm:p-2 rounded-lg transition-all ${chartType === 'area' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600'}`}><TrendingUp className="w-3 h-3 sm:w-4 sm:h-4" /></button>
               </div>
             </div>
           )}
         </div>
 
-        {/* Teacher Summary View - Responsive Tables */}
+        {/* Teacher Summary View */}
         {viewMode === 'teacher' && (
           <div className="space-y-4">
             {teacherHummaries.length === 0 ? (
@@ -1236,7 +1292,6 @@ const handleExportExcel = () => {
                   key={teacher.teacher_id}
                   className="bg-white rounded-2xl shadow-md hover:shadow-lg transition-all duration-300 border border-slate-100 overflow-hidden"
                 >
-                  {/* Teacher Header */}
                   <div
                     className="p-3 sm:p-5 bg-linear-to-r from-slate-50 to-white border-b border-slate-100 cursor-pointer hover:from-indigo-50 hover:to-indigo-50/30 transition-all duration-300 group"
                     onClick={() => toggleTeacher(teacher.teacher_id)}
@@ -1294,7 +1349,6 @@ const handleExportExcel = () => {
                     </div>
                   </div>
 
-                  {/* Student Tables - Mobile Responsive */}
                   {expandedTeachers.has(teacher.teacher_id) && (
                     <div className="p-3 sm:p-4 space-y-4 sm:space-y-6">
                       {/* Grade 11 Section */}
@@ -1308,7 +1362,6 @@ const handleExportExcel = () => {
                             <span className="text-[10px] sm:text-xs text-slate-400 ml-auto">{grade11Students.length} students</span>
                           </div>
                           
-                          {/* Desktop Table View - hidden on mobile */}
                           <div className="hidden md:block overflow-x-auto">
                             <table className="w-full min-w-[860px]">
                               <thead className="bg-slate-50">
@@ -1375,7 +1428,6 @@ const handleExportExcel = () => {
                             </table>
                           </div>
 
-                          {/* Mobile Card View - visible on mobile */}
                           <div className="space-y-3 md:hidden">
                             {grade11Students.map((student) => (
                               <div key={student.student_id} className="bg-slate-50 rounded-xl p-3 border border-slate-100">
@@ -1446,7 +1498,6 @@ const handleExportExcel = () => {
                             <span className="text-[10px] sm:text-xs text-slate-400 ml-auto">{grade12Students.length} students</span>
                           </div>
                           
-                          {/* Desktop Table View */}
                           <div className="hidden md:block overflow-x-auto">
                             <table className="w-full min-w-[860px]">
                               <thead className="bg-slate-50">
@@ -1513,7 +1564,6 @@ const handleExportExcel = () => {
                             </table>
                           </div>
 
-                          {/* Mobile Card View */}
                           <div className="space-y-3 md:hidden">
                             {grade12Students.map((student) => (
                               <div key={student.student_id} className="bg-slate-50 rounded-xl p-3 border border-slate-100">
@@ -1573,7 +1623,6 @@ const handleExportExcel = () => {
                         </div>
                       )}
 
-                      {/* No students message */}
                       {grade11Students.length === 0 && grade12Students.length === 0 && (
                         <div className="text-center py-6 sm:py-8 text-slate-500 text-sm">
                           No students assigned to this teacher
@@ -1586,7 +1635,7 @@ const handleExportExcel = () => {
               })
             )}
 
-            {/* Pagination - Responsive */}
+            {/* Pagination */}
             {teacherHummaries.length > 0 && (
               <div className="bg-white rounded-2xl shadow-sm border border-slate-100 px-4 sm:px-6 py-3 sm:py-4 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
                 <p className="text-xs sm:text-sm text-slate-600">
@@ -1624,7 +1673,7 @@ const handleExportExcel = () => {
           </div>
         )}
 
-        {/* Chart View - Responsive */}
+        {/* Chart View */}
         {viewMode === 'chart' && (
           <div className={`bg-white rounded-2xl shadow-lg border border-slate-100 p-3 sm:p-6 transition-all duration-300 ${chartSize === 'large' ? 'h-96 sm:h-150' : 'h-80 sm:h-112.5'}`}>
             <div className="mb-3 sm:mb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
@@ -1732,7 +1781,7 @@ const handleExportExcel = () => {
           </div>
         )}
 
-        {/* AI Details Modal - Responsive */}
+        {/* AI Details Modal */}
         {activeAiModal && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-4 animate-in fade-in">
             <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl max-h-[80vh] overflow-hidden">
@@ -1850,7 +1899,7 @@ const handleExportExcel = () => {
           </div>
         )}
 
-        {/* Clear Data Modal - Responsive */}
+        {/* Clear Data Modal */}
         {showClearModal && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-4 animate-in fade-in">
             <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl animate-in zoom-in-95">
@@ -1891,7 +1940,7 @@ const handleExportExcel = () => {
                       {clearOption === option.value && option.value === 'teacher' && (
                         <select value={clearTeacher} onChange={(e) => setClearTeacher(e.target.value)} onClick={(e) => e.stopPropagation()} className="mt-2 sm:mt-3 w-full px-3 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none text-sm">
                           <option value="">Select teacher</option>
-                          {teachers.map(teacher => <option key={teacher.id} value={teacher.id}>{teacher.full_name}</option>)}
+                          {teachers.map(teacher => <option key={teacher.id} value={teacher.id}>{formatTeacherName(teacher.full_name)}</option>)}
                         </select>
                       )}
                     </label>
