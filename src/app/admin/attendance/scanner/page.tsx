@@ -971,38 +971,24 @@ export default function QRScannerPage() {
     }
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'present': return 'border-green-500 bg-green-50'
-      case 'late': return 'border-yellow-500 bg-yellow-50'
-      case 'absent': return 'border-red-500 bg-red-50'
-      default: return 'border-gray-200 bg-white'
-    }
-  }
-
-  const getStatusBadgeColor = (status: string) => {
-    switch (status) {
-      case 'present': return 'bg-green-500'
-      case 'late': return 'bg-yellow-500'
-      case 'absent': return 'bg-red-500'
-      default: return 'bg-gray-400'
-    }
-  }
-
   const downloadSeatPlan = async () => {
     if (!seatPlanRef.current || seatArrangement.length === 0) return
     
     setDownloadingSeatPlan(true)
     
     try {
-      // Create a temporary div for printing
       const printWindow = window.open('', '_blank')
       if (!printWindow) {
         alert('Please allow popups to download the seat plan')
         return
       }
       
-      const today = new Date().toLocaleDateString()
+      const today = new Date().toLocaleDateString('en-US', { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      })
       const sessionInfo = selectedSessionDetails 
         ? `Grade ${selectedSessionDetails.grade} - ${selectedSessionDetails.section}`
         : 'Classroom'
@@ -1013,129 +999,300 @@ export default function QRScannerPage() {
         <head>
           <title>Seat Plan - ${sessionInfo}</title>
           <style>
+            @page {
+              size: landscape;
+              margin: 1.5cm;
+            }
+            
             * {
               margin: 0;
               padding: 0;
               box-sizing: border-box;
             }
+            
             body {
-              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-              padding: 40px;
+              font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Tahoma, Geneva, Verdana, sans-serif;
               background: white;
+              color: #1f2937;
             }
+            
             .container {
-              max-width: 1200px;
+              max-width: 100%;
               margin: 0 auto;
             }
+            
+            /* Elegant Header */
             .header {
               text-align: center;
-              margin-bottom: 30px;
-              padding-bottom: 20px;
-              border-bottom: 2px solid #e5e7eb;
+              margin-bottom: 2.5rem;
+              padding-bottom: 1.5rem;
+              border-bottom: 3px solid #e5e7eb;
             }
+            
+            .header .school-name {
+              font-size: 1.5rem;
+              font-weight: 700;
+              color: #1e40af;
+              letter-spacing: -0.5px;
+              margin-bottom: 0.5rem;
+            }
+            
             .header h1 {
-              font-size: 24px;
-              color: #1f2937;
-              margin-bottom: 8px;
+              font-size: 1.75rem;
+              font-weight: 800;
+              color: #111827;
+              margin-bottom: 0.5rem;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              gap: 0.5rem;
             }
-            .header p {
+            
+            .header .session-info {
+              font-size: 1.1rem;
+              color: #4b5563;
+              font-weight: 600;
+            }
+            
+            .header .date-info {
+              font-size: 0.9rem;
               color: #6b7280;
-              font-size: 14px;
+              margin-top: 0.25rem;
             }
+            
+            .header .stats-row {
+              display: flex;
+              justify-content: center;
+              gap: 2rem;
+              margin-top: 1rem;
+              font-size: 0.9rem;
+              color: #6b7280;
+            }
+            
+            .header .stat-item {
+              display: flex;
+              align-items: center;
+              gap: 0.5rem;
+            }
+            
+            .header .stat-dot {
+              width: 10px;
+              height: 10px;
+              border-radius: 50%;
+              display: inline-block;
+            }
+            
+            .stat-dot.present { background: #10b981; }
+            .stat-dot.late { background: #f59e0b; }
+            .stat-dot.absent { background: #ef4444; }
+            .stat-dot.unmarked { background: #d1d5db; }
+            
+            /* Seat Grid - Auto-fill responsive */
             .seat-grid {
               display: grid;
-              grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-              gap: 20px;
-              margin-top: 20px;
+              grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+              gap: 1.25rem;
+              padding: 0.5rem;
             }
+            
+            /* Elegant Seat Card */
             .seat-card {
               background: white;
               border: 2px solid #e5e7eb;
-              border-radius: 12px;
-              padding: 20px 12px;
+              border-radius: 16px;
+              padding: 1.25rem 1rem;
               text-align: center;
               position: relative;
               page-break-inside: avoid;
               break-inside: avoid;
+              transition: all 0.2s;
+              min-height: 100px;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
             }
+            
+            /* Seat Number Badge */
             .seat-number {
               position: absolute;
-              top: -10px;
-              left: -10px;
-              width: 28px;
-              height: 28px;
-              background: #374151;
+              top: -12px;
+              left: -12px;
+              width: 32px;
+              height: 32px;
+              background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
               color: white;
               border-radius: 50%;
               display: flex;
               align-items: center;
               justify-content: center;
-              font-size: 12px;
-              font-weight: bold;
+              font-size: 0.8rem;
+              font-weight: 700;
+              box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+              border: 2px solid white;
             }
+            
+            /* Student Name */
             .student-name {
-              font-size: 16px;
-              font-weight: 600;
-              color: #1f2937;
-              margin-bottom: 8px;
+              font-size: 1rem;
+              font-weight: 700;
+              color: #111827;
+              margin-bottom: 0.5rem;
               word-break: break-word;
+              line-height: 1.3;
             }
-            .status-badge {
-              display: inline-block;
-              padding: 4px 12px;
-              border-radius: 20px;
-              font-size: 11px;
-              font-weight: 600;
-              margin-top: 8px;
-            }
-            .present { background: #d1fae5; color: #065f46; border: 1px solid #34d399; }
-            .late { background: #fef3c7; color: #92400e; border: 1px solid #fbbf24; }
-            .absent { background: #fee2e2; color: #991b1b; border: 1px solid #f87171; }
-            .not-marked { background: #f3f4f6; color: #4b5563; border: 1px solid #d1d5db; }
-            .footer {
-              margin-top: 40px;
-              padding-top: 20px;
-              border-top: 1px solid #e5e7eb;
-              text-align: center;
-              font-size: 12px;
+            
+            .student-lrn {
+              font-size: 0.75rem;
               color: #9ca3af;
+              margin-bottom: 0.75rem;
             }
+            
+            /* Status Strip - Clean and minimal */
+            .status-strip {
+              width: 100%;
+              height: 4px;
+              border-radius: 2px;
+              margin-top: auto;
+            }
+            
+            .status-strip.present { background: #10b981; }
+            .status-strip.late { background: #f59e0b; }
+            .status-strip.absent { background: #ef4444; }
+            .status-strip.unmarked { background: #e5e7eb; }
+            
+            /* Legend */
+            .legend {
+              display: flex;
+              justify-content: center;
+              gap: 2rem;
+              margin-top: 2rem;
+              padding: 1rem 1.5rem;
+              background: #f9fafb;
+              border-radius: 12px;
+              border: 1px solid #e5e7eb;
+            }
+            
+            .legend-item {
+              display: flex;
+              align-items: center;
+              gap: 0.5rem;
+              font-size: 0.85rem;
+              color: #4b5563;
+              font-weight: 500;
+            }
+            
+            .legend-dot {
+              width: 12px;
+              height: 12px;
+              border-radius: 4px;
+            }
+            
+            .legend-dot.present { background: #10b981; }
+            .legend-dot.late { background: #f59e0b; }
+            .legend-dot.absent { background: #ef4444; }
+            
+            /* Footer */
+            .footer {
+              margin-top: 2.5rem;
+              padding-top: 1.5rem;
+              border-top: 2px solid #f3f4f6;
+              text-align: center;
+              font-size: 0.8rem;
+              color: #9ca3af;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+            }
+            
+            .footer .brand {
+              font-weight: 600;
+              color: #1e40af;
+            }
+            
             @media print {
               body {
-                padding: 20px;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
               }
+              
               .seat-card {
                 break-inside: avoid;
                 page-break-inside: avoid;
+                border-color: #d1d5db;
               }
             }
           </style>
         </head>
         <body>
           <div class="container">
+            <!-- Header -->
             <div class="header">
-              <h1>📋 Classroom Seat Plan</h1>
-              <p>${sessionInfo} • Generated: ${today}</p>
-              <p style="font-size: 12px; margin-top: 5px;">Total Students: ${seatArrangement.length}</p>
+              <div class="school-name">St. Anne's Academy</div>
+              <h1>
+                📋 Classroom Seat Plan
+              </h1>
+              <div class="session-info">${sessionInfo}</div>
+              <div class="date-info">${today}</div>
+              <div class="stats-row">
+                <div class="stat-item">
+                  <span class="stat-dot present"></span>
+                  Present: ${seatArrangement.filter(s => studentAttendanceStatus[s.id] === 'present').length}
+                </div>
+                <div class="stat-item">
+                  <span class="stat-dot late"></span>
+                  Late: ${seatArrangement.filter(s => studentAttendanceStatus[s.id] === 'late').length}
+                </div>
+                <div class="stat-item">
+                  <span class="stat-dot absent"></span>
+                  Absent: ${seatArrangement.filter(s => studentAttendanceStatus[s.id] === 'absent').length}
+                </div>
+                <div class="stat-item">
+                  <span class="stat-dot unmarked"></span>
+                  Pending: ${seatArrangement.filter(s => !studentAttendanceStatus[s.id]).length}
+                </div>
+              </div>
             </div>
+            
+            <!-- Seat Grid -->
             <div class="seat-grid">
               ${seatArrangement.map((student, index) => {
                 const status = studentAttendanceStatus[student.id]
                 const displayName = getSimplifiedName(student)
-                const statusClass = status === 'present' ? 'present' : status === 'late' ? 'late' : status === 'absent' ? 'absent' : 'not-marked'
-                const statusText = status ? status.toUpperCase() : 'Not Marked'
+                const statusClass = status || 'unmarked'
                 
                 return `
                   <div class="seat-card">
                     <div class="seat-number">${index + 1}</div>
                     <div class="student-name">${displayName}</div>
-                    <div class="status-badge ${statusClass}">${statusText}</div>
+                    ${status ? `<div class="student-lrn">LRN: ${student.lrn}</div>` : ''}
+                    <div class="status-strip ${statusClass}"></div>
                   </div>
                 `
               }).join('')}
             </div>
+            
+            <!-- Legend -->
+            <div class="legend">
+              <div class="legend-item">
+                <div class="legend-dot present"></div>
+                Present
+              </div>
+              <div class="legend-item">
+                <div class="legend-dot late"></div>
+                Late
+              </div>
+              <div class="legend-item">
+                <div class="legend-dot absent"></div>
+                Absent
+              </div>
+            </div>
+            
+            <!-- Footer -->
             <div class="footer">
-              <p>St. Anne's Academy - EduScan Attendance System</p>
+              <span>Total Students: ${seatArrangement.length}</span>
+              <span class="brand">EduScan Attendance System</span>
+              <span>Generated: ${new Date().toLocaleTimeString()}</span>
             </div>
           </div>
         </body>
@@ -1144,7 +1301,12 @@ export default function QRScannerPage() {
       
       printWindow.document.write(htmlContent)
       printWindow.document.close()
-      printWindow.print()
+      
+      // Wait for content to load before printing
+      printWindow.onload = () => {
+        printWindow.print()
+        printWindow.close()
+      }
       
     } catch (error) {
       console.error('Error generating seat plan:', error)
