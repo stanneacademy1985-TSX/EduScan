@@ -775,107 +775,274 @@ export default function AttendanceReportsPage() {
   const handleExportPDF = async () => {
     try {
       setExporting(true)
-      const doc = new jsPDF()
 
-      doc.setFillColor(59, 130, 246)
-      doc.rect(0, 0, 210, 40, 'F')
-      
-      doc.setTextColor(255, 255, 255)
-      doc.setFontSize(24)
-      doc.setFont('helvetica', 'bold')
-      doc.text('Attendance Report', 105, 25, { align: 'center' })
+      const sf2Sections = buildSf2Sections(filteredData)
+      if (!sf2Sections.length) {
+        console.warn('No attendance data available for SF2 export')
+        return
+      }
 
-      doc.setFontSize(11)
-      doc.setFont('helvetica', 'normal')
-      doc.text(`Generated: ${new Date().toLocaleString()}`, 105, 35, { align: 'center' })
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'legal' })
+      const reportMonthLabel = formatReportMonthLabel(dateRange.start, dateRange.end)
+      const pageWidth = doc.internal.pageSize.getWidth()
+      const pageHeight = doc.internal.pageSize.getHeight()
+      const marginX = 6
+      const tableTop = 40
+      const footerReserve = 50
+      const footerTop = pageHeight - footerReserve - 6
 
-      let yPos = 50
-      doc.setTextColor(33, 37, 41)
-      doc.setFontSize(14)
-      doc.setFont('helvetica', 'bold')
-      doc.text('Summary', 20, yPos)
+      const loadImageAsDataUrl = async (imagePath: string) => {
+        const response = await fetch(imagePath)
+        if (!response.ok) return null
 
-      doc.setFontSize(10)
-      doc.setFont('helvetica', 'normal')
-      doc.setTextColor(73, 80, 87)
-      
-      const summaryData = [
-        ['Period:', `${dateRange.start} to ${dateRange.end}`],
-        ['Total Students:', summary.totalStudents.toString()],
-        ['Total Teachers:', summary.totalTeachers.toString()],
-        ['Total Records:', summary.totalAttendance.toString()],
-        ['Present:', summary.presentCount.toString()],
-        ['Late:', summary.lateCount.toString()],
-        ['Absent:', summary.absentCount.toString()],
-        ['Avg per Student:', summary.averageAttendance.toString()],
-        ['Top Performer:', summary.topPerformer],
-        ['Most Active Grade:', summary.mostActiveGrade]
-      ]
+        const blob = await response.blob()
+        return await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onloadend = () => resolve(reader.result as string)
+          reader.onerror = () => reject(new Error('Unable to read logo image'))
+          reader.readAsDataURL(blob)
+        })
+      }
 
-      let summaryX = 20
-      summaryData.forEach((item, index) => {
-        if (index < 5) {
-          doc.text(item[0], summaryX, yPos + 10 + (index * 7))
-          doc.text(item[1], summaryX + 40, yPos + 10 + (index * 7))
-        } else if (index < 10) {
-          doc.text(item[0], summaryX + 100, yPos + 10 + ((index - 5) * 7))
-          doc.text(item[1], summaryX + 140, yPos + 10 + ((index - 5) * 7))
+      const schoolLogo = await loadImageAsDataUrl('/logo.png')
+
+      for (const group of sf2Sections) {
+        // Ensure the weekday columns include Mon..Fri even when the range starts mid-week
+        const weekdaySet = new Set(['M', 'T', 'W', 'TH', 'F'])
+        const dateHeaders: any[] = []
+        const firstDateStr = group.dates?.[0]?.date
+        if (firstDateStr) {
+          const firstDate = new Date(`${firstDateStr}T00:00:00`)
+          const firstDay = firstDate.getDay() // 0=Sun,1=Mon...
+          // insert placeholders for any weekdays before the first date (Mon=1 .. Fri=5)
+          for (let w = 1; w < firstDay; w++) {
+            if (w >= 1 && w <= 5) {
+              const weekLabels = ['SU', 'M', 'T', 'W', 'TH', 'F', 'SA']
+              dateHeaders.push({ date: `__placeholder_${firstDateStr}_${w}`, dayNumber: '', weekday: weekLabels[w], label: weekLabels[w] })
+            }
+          }
         }
-      })
-
-      yPos = 120
-      teacherSummaries.slice(0, 3).forEach((teacher, index) => {
-        if (index > 0) {
-          yPos += 20
-        }
-
-        doc.setFontSize(12)
-        doc.setFont('helvetica', 'bold')
-        doc.setTextColor(59, 130, 246)
-        doc.text(teacher.teacher_name, 20, yPos)
-        
-        doc.setFontSize(9)
-        doc.setFont('helvetica', 'normal')
-        doc.setTextColor(73, 80, 87)
-        doc.text(`Sessions: ${teacher.total_sessions} | Students: ${teacher.total_students} | Present: ${teacher.present_count} | Late: ${teacher.late_count} | Absent: ${teacher.absent_count} | Rate: ${teacher.attendance_rate}%`, 20, yPos + 6)
-
-        const studentColumns = [
-          { header: 'Student', dataKey: 'name' },
-          { header: 'Grade/Sec', dataKey: 'grade' },
-          { header: 'Sessions', dataKey: 'sessions' },
-          { header: 'P', dataKey: 'present' },
-          { header: 'L', dataKey: 'late' },
-          { header: 'A', dataKey: 'absent' },
-          { header: 'Rate', dataKey: 'rate' }
-        ]
-
-        const studentRows = teacher.students.slice(0, 8).map(s => ({
-          name: s.student_name,
-          grade: `G${s.grade}`,
-          sessions: s.total_sessions,
-          present: s.present,
-          late: s.late,
-          absent: s.absent,
-          rate: `${s.attendance_rate}%`
-        }))
-
-        autoTable(doc, {
-          startY: yPos + 12,
-          head: [studentColumns.map(c => c.header)],
-          body: studentRows.map(r => Object.values(r)),
-          theme: 'striped',
-          headStyles: { fillColor: [59, 130, 246], textColor: [255, 255, 255], fontStyle: 'bold' },
-          alternateRowStyles: { fillColor: [240, 244, 248] },
-          margin: { left: 20, right: 20 },
-          styles: { fontSize: 8, cellPadding: 3 }
+        // Append actual weekday dates in order
+        group.dates.forEach(dateColumn => {
+          if (weekdaySet.has(dateColumn.weekday)) {
+            dateHeaders.push({ ...dateColumn, label: dateColumn.weekday })
+          }
         })
 
-        yPos = ((doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || (yPos + 12)) + 10
-      })
+        const buildTableBody = (learners: Sf2LearnerRow[], startIdx: number) => {
+          const body: any[] = []
 
-      doc.save(`attendance_report_${dateRange.start}_to_${dateRange.end}.pdf`)
+          learners.forEach((learner, idx) => {
+            body.push([
+              (startIdx + idx + 1).toString(),
+              learner.student_name,
+              ...dateHeaders.map(dateColumn => {
+                const code = learner.attendanceByDate[dateColumn.date] || ''
+                return code === 'P' ? 'P' : code === 'A' ? 'A' : code === 'L' ? 'L' : ''
+              }),
+              learner.absentCount.toString(),
+              (learner.presentCount + learner.lateCount).toString(),
+              learner.lrn ? `LRN ${learner.lrn}` : ''
+            ])
+          })
+
+          return body
+        }
+
+        const calculateDailyTotals = (learners: Sf2LearnerRow[]) => {
+          return dateHeaders.map(dateColumn => {
+            const present = learners.reduce((count, learner) => {
+              const code = learner.attendanceByDate[dateColumn.date]
+              return count + (code === 'P' ? 1 : 0)
+            }, 0)
+
+            return present.toString()
+          })
+        }
+
+        const maleLearners = group.maleLearners
+        const femaleLearners = group.femaleLearners
+        const completeBody: any[] = []
+        let learnerStartIndex = 0
+
+        const appendLearnerGroup = (label: string, learners: Sf2LearnerRow[]) => {
+          if (!learners.length) return
+
+          completeBody.push([
+            { content: `${label} LEARNERS`, colSpan: 5 + dateHeaders.length, styles: { halign: 'left', fontStyle: 'bold', fillColor: [226, 232, 240] } }
+          ])
+
+          buildTableBody(learners, learnerStartIndex).forEach(row => completeBody.push(row))
+          learnerStartIndex += learners.length
+
+          const subtotalRow: any[] = [
+            '',
+            `${label} TOTAL PER DAY`,
+            ...calculateDailyTotals(learners),
+            learners.reduce((total, learner) => total + learner.absentCount, 0).toString(),
+            learners.reduce((total, learner) => total + learner.presentCount + learner.lateCount, 0).toString(),
+            ''
+          ]
+
+          completeBody.push(subtotalRow)
+          completeBody.push([{ content: '', colSpan: 5 + dateHeaders.length, styles: { fillColor: [248, 250, 252] } }])
+        }
+
+        appendLearnerGroup('MALE', maleLearners)
+        appendLearnerGroup('FEMALE', femaleLearners)
+        appendLearnerGroup('UNSPECIFIED', group.unknownLearners)
+
+        completeBody.push([
+          '',
+          'COMBINED TOTAL PER DAY',
+          ...calculateDailyTotals(group.learners),
+          group.absentCount.toString(),
+          (group.presentCount + group.lateCount).toString(),
+          ''
+        ])
+
+        const rowCount = completeBody.length
+        const compactMode = rowCount > 38
+        const tableFontSize = compactMode ? 4.5 : rowCount > 30 ? 4.8 : 5.2
+        const tablePadding = compactMode ? 0.45 : rowCount > 30 ? 0.55 : 0.75
+        const learnerWidth = compactMode ? 42 : 46
+        const remarksWidth = compactMode ? 18 : 22
+        const dateCellWidth = Math.max(5.2, Math.min(6.6, (pageWidth - (marginX * 2) - 6 - learnerWidth - 10 - 10 - remarksWidth) / Math.max(dateHeaders.length, 1)))
+
+        if (schoolLogo) {
+          try {
+            doc.addImage(schoolLogo, 'PNG', marginX, 5, 14, 14)
+          } catch (error) {
+            console.warn('Unable to render SF2 logo', error)
+          }
+        }
+
+        doc.setTextColor(0, 0, 0)
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(13)
+        doc.text(process.env.NEXT_PUBLIC_SCHOOL_NAME || 'Saint Anne Academy', pageWidth / 2, 9, { align: 'center' })
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(9)
+        doc.text('School Form 2 (SF2) Daily Attendance Report of Learners', pageWidth / 2, 14, { align: 'center' })
+        doc.setFontSize(7.5)
+        doc.text('Official SF2-style attendance layout generated from the selected filters', pageWidth / 2, 18, { align: 'center' })
+
+        doc.setDrawColor(0, 0, 0)
+        doc.setLineWidth(0.15)
+        doc.rect(marginX, 22.5, pageWidth - marginX * 2, 13)
+        doc.line(pageWidth / 2, 22.5, pageWidth / 2, 35.5)
+        doc.line(marginX, 29, pageWidth - marginX, 29)
+
+        doc.setFontSize(7.5)
+        doc.setFont('helvetica', 'bold')
+        doc.text('School Name', marginX + 2, 26)
+        doc.text('School Year', pageWidth / 2 + 2, 26)
+        doc.text('Grade Level', marginX + 2, 32.5)
+        doc.text('Section / Adviser', pageWidth / 2 + 2, 32.5)
+
+        doc.setFont('helvetica', 'normal')
+        doc.text(process.env.NEXT_PUBLIC_SCHOOL_NAME || 'Saint Anne Academy', marginX + 18, 26)
+        doc.text(getSchoolYearLabel(dateRange.start) || '________________', pageWidth / 2 + 18, 26)
+        doc.text(`Grade ${group.grade}`, marginX + 18, 32.5)
+        doc.text(`${group.section} / ${group.adviser}`, pageWidth / 2 + 18, 32.5, { maxWidth: (pageWidth / 2) - 20 })
+
+        autoTable(doc, {
+          startY: tableTop,
+          head: [[
+            'No.',
+            "Learner's Name",
+            ...dateHeaders.map(dateColumn => dateColumn.label),
+            'ABSENT',
+            'PRESENT',
+            'REMARKS'
+          ]],
+          body: completeBody,
+          theme: 'grid',
+          pageBreak: 'avoid',
+          rowPageBreak: 'avoid',
+          tableWidth: 'auto',
+          styles: {
+            fontSize: tableFontSize,
+            cellPadding: tablePadding,
+            valign: 'middle',
+            lineColor: [0, 0, 0],
+            lineWidth: 0.1
+          },
+          headStyles: {
+            fillColor: [226, 232, 240],
+            textColor: [0, 0, 0],
+            fontStyle: 'bold',
+            halign: 'center',
+            valign: 'middle'
+          },
+          columnStyles: {
+            0: { cellWidth: 8, halign: 'center' },
+            1: { cellWidth: learnerWidth, halign: 'left' },
+            ...Object.fromEntries(dateHeaders.map((_, idx) => [idx + 2, { cellWidth: dateCellWidth, halign: 'center' }])),
+            [dateHeaders.length + 2]: { cellWidth: 10, halign: 'center' },
+            [dateHeaders.length + 3]: { cellWidth: 10, halign: 'center' },
+            [dateHeaders.length + 4]: { cellWidth: remarksWidth, halign: 'left' }
+          },
+          margin: { left: marginX, right: marginX, top: tableTop, bottom: footerReserve },
+          didParseCell: (data) => {
+            const rawRow = data.row.raw as any
+
+            if (Array.isArray(rawRow) && rawRow[0]?.content?.includes('LEARNERS')) {
+              data.cell.styles.fontStyle = 'bold'
+              data.cell.styles.fillColor = [59, 130, 246]
+              data.cell.styles.textColor = [255, 255, 255]
+            }
+
+            if (Array.isArray(rawRow) && rawRow[1]?.content?.includes('TOTAL PER DAY')) {
+              data.cell.styles.fontStyle = 'bold'
+              data.cell.styles.fillColor = [241, 245, 249]
+            }
+          }
+        })
+
+        doc.setDrawColor(0, 0, 0)
+        doc.setLineWidth(0.15)
+        // increase footer box height to fit guidelines
+        doc.rect(marginX, footerTop, pageWidth - marginX * 2, 40)
+
+        doc.setFontSize(8)
+        doc.setFont('helvetica', 'bold')
+        doc.text('ATTENDANCE CODES / SUMMARY', marginX + 2, footerTop + 6)
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(7)
+        doc.text(`Learners: ${group.totalCount}  |  Present / On Time: ${group.presentCount}  |  Late: ${group.lateCount}  |  Absent: ${group.absentCount}`, marginX + 2, footerTop + 12)
+        doc.text(`Report Month: ${reportMonthLabel}`, marginX + 2, footerTop + 17)
+
+        // Codes on center-right
+        doc.setFont('helvetica', 'bold')
+        doc.text('P - Present', pageWidth / 2 - 30, footerTop + 12)
+        doc.setFont('helvetica', 'normal')
+        doc.text('L - Late', pageWidth / 2 - 30, footerTop + 17)
+        doc.text('A - Absent', pageWidth / 2 - 30, footerTop + 22)
+
+        // Add short guidance for teachers on the left of the codes
+        doc.setFont('helvetica', 'bold')
+        doc.text('Guidelines:', marginX + 2, footerTop + 22)
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(6.8)
+        doc.text('1. Mark only one code per learner per date.', marginX + 2, footerTop + 27, { maxWidth: (pageWidth / 2) - 12 })
+        doc.text('2. Use the final daily status for the day.', marginX + 2, footerTop + 32, { maxWidth: (pageWidth / 2) - 12 })
+
+        doc.setFont('helvetica', 'bold')
+        doc.text('Certified true and correct by the adviser:', pageWidth - marginX - 2, footerTop + 6, { align: 'right' })
+        doc.setFont('helvetica', 'normal')
+        doc.line(pageWidth - 90, footerTop + 18, pageWidth - 10, footerTop + 18)
+        doc.text('Signature over Printed Name', pageWidth - 50, footerTop + 22, { align: 'center' })
+
+        doc.setFontSize(6)
+        doc.setTextColor(100, 100, 100)
+        doc.text('Generated by EduScan', pageWidth / 2, pageHeight - 4, { align: 'center' })
+      }
+
+      doc.save(`SF2_ATTENDANCE_REPORT_${dateRange.start}_to_${dateRange.end}.pdf`)
     } catch (error) {
-      console.error('Error exporting PDF:', error)
+      console.error('Error exporting SF2 PDF:', error)
+      alert('Failed to generate SF2 PDF. Please try again.')
     } finally {
       setExporting(false)
     }
