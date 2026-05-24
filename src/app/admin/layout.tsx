@@ -378,16 +378,20 @@ export default function AdminLayout({
                 </h1>
               </div>
 
-              <div className="flex items-center gap-4">
-                <div className="hidden md:flex items-center gap-3 cursor-pointer" onClick={() => router.push('/admin/profile')} title="Open profile">
-                  <div className="text-right">
+              <div className="flex items-center gap-2 sm:gap-4">
+                <button
+                  onClick={() => router.push('/admin/profile')}
+                  title="Open profile"
+                  className="flex items-center gap-2 sm:gap-3 rounded-xl px-2 py-1.5 hover:bg-gray-50 transition-colors"
+                >
+                  <div className="text-right hidden sm:block">
                     <p className="text-sm font-medium text-gray-900">{getAdminDisplayName()}</p>
                     <p className="text-xs text-gray-500">{admin?.role || 'Administrator'}</p>
                   </div>
-                  <div className="w-8 h-8 rounded-full bg-linear-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
-                    <User className="w-4 h-4 text-indigo-600" />
+                  <div className="shrink-0 scale-90 sm:scale-100">
+                    {renderProfilePhoto()}
                   </div>
-                </div>
+                </button>
                 <div className="text-sm text-gray-500 hidden lg:block">
                   {new Date().toLocaleDateString('en-US', { 
                     weekday: 'long',
