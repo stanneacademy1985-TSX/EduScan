@@ -1047,7 +1047,7 @@ export default function QRScannerPage() {
   }
 
   return (
-    <div className="space-y-4 sm:space-y-6 pb-6">
+    <div className="mx-auto w-full max-w-screen-2xl space-y-4 px-3 pb-6 sm:space-y-6 sm:px-4 lg:px-6">
       {/* Header - Mobile Optimized */}
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
@@ -1288,7 +1288,7 @@ export default function QRScannerPage() {
 
                   {scannerActive && scanning && (
                     <div className="absolute inset-0 pointer-events-none">
-                      <div className="absolute top-0 left-0 right-0 h-0.5 sm:h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent animate-scan"></div>
+                      <div className="absolute top-0 left-0 right-0 h-0.5 sm:h-1 bg-linear-to-r from-transparent via-blue-500 to-transparent animate-scan"></div>
                     </div>
                   )}
 
@@ -1340,7 +1340,7 @@ export default function QRScannerPage() {
                         </span>
                       )}
                     </p>
-                    <p className={`text-xs sm:text-sm mt-1 break-words ${
+                    <p className={`text-xs sm:text-sm mt-1 wrap-break-word ${
                       scanResult.success ? 'text-green-600' : 'text-red-600'
                     }`}>
                       {scanResult.message}
@@ -1367,7 +1367,7 @@ export default function QRScannerPage() {
         // Seat Plan View with Attendance Toolbar - Mobile Optimized
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           {/* Attendance Toolbar */}
-          <div className="border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white p-3 sm:p-5">
+          <div className="border-b border-gray-200 bg-linear-to-r from-gray-50 to-white p-3 sm:p-5">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
               <div>
                 <h2 className="text-base sm:text-lg font-semibold text-gray-800 flex items-center gap-2">
@@ -1503,7 +1503,7 @@ export default function QRScannerPage() {
             ) : (
               <>
                 {/* Responsive grid - 3 columns mobile, more on desktop */}
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-1.5 sm:gap-2 md:gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2 sm:gap-2 md:gap-3">
                   {seatArrangement.map((student, index) => {
                     const status = studentAttendanceStatus[student.id]
                     const isMarked = !!status
@@ -1515,7 +1515,7 @@ export default function QRScannerPage() {
                       <div
                         key={student.id}
                         onClick={() => handleStudentCardClick(student.id)}
-                        className={`relative rounded-lg sm:rounded-xl border-2 transition-all duration-200 cursor-pointer touch-manipulation min-h-[80px] sm:min-h-[90px] md:min-h-[100px] flex flex-col ${
+                        className={`relative rounded-lg sm:rounded-xl border-2 transition-all duration-200 cursor-pointer touch-manipulation min-h-20 sm:min-h-22.5 md:min-h-25 flex flex-col ${
                           isMarked
                             ? statusStyles.card
                             : isSelected
@@ -1546,7 +1546,7 @@ export default function QRScannerPage() {
                           
                           {/* Student Name */}
                           <div className="text-center flex-1 flex items-center">
-                            <p className="font-semibold text-gray-800 text-[11px] sm:text-xs md:text-sm leading-tight break-words line-clamp-2">
+                            <p className="font-semibold text-gray-800 text-[11px] sm:text-xs md:text-sm leading-tight wrap-break-word line-clamp-2">
                               {displayName}
                             </p>
                           </div>
@@ -1570,26 +1570,26 @@ export default function QRScannerPage() {
             {/* Summary Stats - Fully Responsive */}
             {sectionStudents.length > 0 && (
               <div className="mt-4 sm:mt-6 pt-3 sm:pt-4 border-t border-gray-200">
-                <div className="grid grid-cols-5 gap-1 sm:gap-1.5 md:gap-2">
-                  <div className="bg-blue-50 rounded-lg p-1.5 sm:p-2 md:p-2.5 text-center">
-                    <p className="text-[9px] sm:text-[10px] md:text-xs text-gray-600 truncate">Total</p>
-                    <p className="text-xs sm:text-sm md:text-base lg:text-lg font-bold text-blue-600 mt-0.5">{sectionStudents.length}</p>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2 md:grid-cols-5 md:gap-2">
+                  <div className="bg-blue-50 rounded-lg p-2 sm:p-2.5 text-center">
+                    <p className="text-[10px] sm:text-xs text-gray-600 truncate">Total</p>
+                    <p className="text-sm sm:text-base md:text-lg lg:text-xl font-bold text-blue-600 mt-0.5">{sectionStudents.length}</p>
                   </div>
-                  <div className="bg-green-50 rounded-lg p-1.5 sm:p-2 md:p-2.5 text-center">
-                    <p className="text-[9px] sm:text-[10px] md:text-xs text-gray-600 truncate">Present</p>
-                    <p className="text-xs sm:text-sm md:text-base lg:text-lg font-bold text-green-600 mt-0.5">{stats.presentCount}</p>
+                  <div className="bg-green-50 rounded-lg p-2 sm:p-2.5 text-center">
+                    <p className="text-[10px] sm:text-xs text-gray-600 truncate">Present</p>
+                    <p className="text-sm sm:text-base md:text-lg lg:text-xl font-bold text-green-600 mt-0.5">{stats.presentCount}</p>
                   </div>
-                  <div className="bg-yellow-50 rounded-lg p-1.5 sm:p-2 md:p-2.5 text-center">
-                    <p className="text-[9px] sm:text-[10px] md:text-xs text-gray-600 truncate">Late</p>
-                    <p className="text-xs sm:text-sm md:text-base lg:text-lg font-bold text-yellow-600 mt-0.5">{stats.lateCount}</p>
+                  <div className="bg-yellow-50 rounded-lg p-2 sm:p-2.5 text-center">
+                    <p className="text-[10px] sm:text-xs text-gray-600 truncate">Late</p>
+                    <p className="text-sm sm:text-base md:text-lg lg:text-xl font-bold text-yellow-600 mt-0.5">{stats.lateCount}</p>
                   </div>
-                  <div className="bg-red-50 rounded-lg p-1.5 sm:p-2 md:p-2.5 text-center">
-                    <p className="text-[9px] sm:text-[10px] md:text-xs text-gray-600 truncate">Absent</p>
-                    <p className="text-xs sm:text-sm md:text-base lg:text-lg font-bold text-red-600 mt-0.5">{stats.absentCount}</p>
+                  <div className="bg-red-50 rounded-lg p-2 sm:p-2.5 text-center">
+                    <p className="text-[10px] sm:text-xs text-gray-600 truncate">Absent</p>
+                    <p className="text-sm sm:text-base md:text-lg lg:text-xl font-bold text-red-600 mt-0.5">{stats.absentCount}</p>
                   </div>
-                  <div className="bg-purple-50 rounded-lg p-1.5 sm:p-2 md:p-2.5 text-center">
-                    <p className="text-[9px] sm:text-[10px] md:text-xs text-gray-600 truncate">Complete</p>
-                    <p className="text-xs sm:text-sm md:text-base lg:text-lg font-bold text-purple-600 mt-0.5">
+                  <div className="bg-purple-50 rounded-lg p-2 sm:p-2.5 text-center col-span-2 sm:col-span-1">
+                    <p className="text-[10px] sm:text-xs text-gray-600 truncate">Complete</p>
+                    <p className="text-sm sm:text-base md:text-lg lg:text-xl font-bold text-purple-600 mt-0.5">
                       {sectionStudents.length > 0 
                         ? Math.round(((stats.presentCount + stats.lateCount + stats.absentCount) / sectionStudents.length) * 100)
                         : 0}%
