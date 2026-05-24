@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '../../../../lib/supabase'
-import { fetchAdminById, getAssignedStudentIds, getStoredAdminSession } from '../../../../lib/admin-auth'
+import { supabase } from '../../../../../lib/supabase'
+import { fetchAdminById, getAssignedStudentIds, getStoredAdminSession } from '../../../../../lib/admin-auth'
 import {
   TrendingUp,
   TrendingDown,
