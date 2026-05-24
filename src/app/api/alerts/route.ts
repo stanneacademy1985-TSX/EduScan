@@ -1,15 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const normalizePhilippineMobile = (phone: string) => {
-  const digits = phone.replace(/[^0-9]/g, '')
-  if (digits.startsWith('09') && digits.length === 11) return '+63' + digits.slice(1)
-  if (digits.startsWith('9') && digits.length === 10) return '+63' + digits
-  if (digits.startsWith('63') && digits.length === 12) return '+' + digits
-  if (digits.startsWith('0') && digits.length === 13) return '+' + digits.slice(1)
-  if (phone.startsWith('+')) return phone
-  return phone
-}
-
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
@@ -17,44 +7,6 @@ export async function POST(req: NextRequest) {
 
     if (!studentId || !studentName || (!mobile && !email)) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
-    }
-
-    const twilioSid = process.env.TWILIO_ACCOUNT_SID
-    const twilioToken = process.env.TWILIO_AUTH_TOKEN
-    const twilioFrom = process.env.TWILIO_FROM_NUMBER
-
-    const safeMobile = mobile ? normalizePhilippineMobile(mobile) : ''
-
-    // Try Twilio SMS first
-    if (safeMobile && twilioSid && twilioToken && twilioFrom) {
-      const url = `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`
-      const payload = new URLSearchParams({
-        From: twilioFrom,
-        To: safeMobile,
-        Body: message || `Attendance alert for ${studentName}`
-      })
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          Authorization: `Basic ${Buffer.from(`${twilioSid}:${twilioToken}`).toString('base64')}`,
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: payload
-      })
-
-      if (!response.ok) {
-        const err = await response.text()
-        console.error('Twilio send failed', err)
-        return NextResponse.json({ error: 'Twilio send failed', detail: err }, { status: 502 })
-      }
-
-      if (email && process.env.AZURE_COMMUNICATION_EMAIL_CONNECTION_STRING && process.env.AZURE_COMMUNICATION_EMAIL_FROM) {
-        // optional: send email an external service (Azure Communication Service)
-        await sendAzureEmail(email, studentName, message)
-      }
-
-      return NextResponse.json({ message: 'SMS sent via Twilio' })
     }
 
     if (email && process.env.AZURE_COMMUNICATION_EMAIL_CONNECTION_STRING && process.env.AZURE_COMMUNICATION_EMAIL_FROM) {
