@@ -25,6 +25,7 @@ interface AdminUser {
   name?: string
   assigned_grade?: string | null
   assigned_section?: string | null
+  profile_photo_base64?: string | null
 }
 
 export default function AdminLayout({
@@ -104,9 +105,16 @@ export default function AdminLayout({
   }
 
   const renderProfilePhoto = () => {
-    // Since we don't have profile photos for admins, just show the icon
+    if (admin?.profile_photo_base64) {
+      return (
+        <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white shadow-md bg-white">
+          <img src={admin.profile_photo_base64} alt={getAdminDisplayName()} className="w-full h-full object-cover" />
+        </div>
+      )
+    }
+
     return (
-      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center border-2 border-white shadow-md">
+      <div className="w-10 h-10 rounded-full bg-linear-to-br from-indigo-100 to-purple-100 flex items-center justify-center border-2 border-white shadow-md">
         <User className="w-5 h-5 text-indigo-600" />
       </div>
     )
@@ -114,6 +122,7 @@ export default function AdminLayout({
 
   const isActive = (path: string) => {
     if (path === '/admin/dashboard' && pathname === '/admin/dashboard') return true
+    if (path === '/admin/profile' && pathname === '/admin/profile') return true
     if (path === '/admin/students' && pathname === '/admin/students') return true
     if (path === '/admin/attendance/sessions' && pathname === '/admin/attendance/sessions') return true
     if (path === '/admin/attendance/scanner' && pathname === '/admin/attendance/scanner') return true
@@ -129,7 +138,7 @@ export default function AdminLayout({
 
   if (authChecking) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-purple-50">
+      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-indigo-50 to-purple-50">
         <div className="text-center">
           <div className="relative inline-block">
             <div className="w-20 h-20 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
@@ -165,7 +174,7 @@ export default function AdminLayout({
           {!sidebarCollapsed ? (
             <>
               <div className="flex items-center gap-2 flex-1">
-                <div className="w-12 h-12 relative flex-shrink-0">
+                <div className="w-12 h-12 relative shrink-0">
                   <img 
                     src="/logo.png" 
                     alt="St. Anne's Academy" 
@@ -173,7 +182,7 @@ export default function AdminLayout({
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
                       target.style.display = 'none';
-                      target.parentElement!.innerHTML = '<span class="text-white font-bold text-lg bg-gradient-to-br from-indigo-600 to-purple-800 w-12 h-12 rounded-xl flex items-center justify-center">SAA</span>';
+                      target.parentElement!.innerHTML = '<span class="text-white font-bold text-lg bg-linear-to-br from-indigo-600 to-purple-800 w-12 h-12 rounded-xl flex items-center justify-center">SAA</span>';
                     }}
                   />
                 </div>
@@ -192,7 +201,7 @@ export default function AdminLayout({
           ) : (
             <>
               <div className="w-full flex justify-center">
-                <div className="w-12 h-12 relative flex-shrink-0">
+                <div className="w-12 h-12 relative shrink-0">
                   <img 
                     src="/logo.png" 
                     alt="SAA" 
@@ -200,7 +209,7 @@ export default function AdminLayout({
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
                       target.style.display = 'none';
-                      target.parentElement!.innerHTML = '<span class="text-white font-bold text-lg bg-gradient-to-br from-indigo-600 to-purple-800 w-12 h-12 rounded-xl flex items-center justify-center">SAA</span>';
+                      target.parentElement!.innerHTML = '<span class="text-white font-bold text-lg bg-linear-to-br from-indigo-600 to-purple-800 w-12 h-12 rounded-xl flex items-center justify-center">SAA</span>';
                     }}
                   />
                 </div>
@@ -249,9 +258,11 @@ export default function AdminLayout({
               }
             `}
           >
-            <LayoutDashboard className="w-5 h-5 flex-shrink-0" />
+            <LayoutDashboard className="w-5 h-5 shrink-0" />
             {!sidebarCollapsed && <span className="text-sm font-medium truncate">Dashboard</span>}
           </Link>
+
+          {/* Profile access moved to logo click; removed sidebar link per user preference */}
 
           <Link
             href="/admin/students"
@@ -264,7 +275,7 @@ export default function AdminLayout({
               }
             `}
           >
-            <Users className="w-5 h-5 flex-shrink-0" />
+            <Users className="w-5 h-5 shrink-0" />
             {!sidebarCollapsed && <span className="text-sm font-medium truncate">Students</span>}
           </Link>
 
@@ -279,7 +290,7 @@ export default function AdminLayout({
               }
             `}
           >
-            <Users className="w-5 h-5 flex-shrink-0" />
+            <Users className="w-5 h-5 shrink-0" />
             {!sidebarCollapsed && <span className="text-sm font-medium truncate">Unregistered</span>}
           </Link>
 
@@ -294,7 +305,7 @@ export default function AdminLayout({
               }
             `}
           >
-            <CalendarDays className="w-5 h-5 flex-shrink-0" />
+            <CalendarDays className="w-5 h-5 shrink-0" />
             {!sidebarCollapsed && <span className="text-sm font-medium truncate">Sessions</span>}
           </Link>
 
@@ -309,7 +320,7 @@ export default function AdminLayout({
               }
             `}
           >
-            <Scan className="w-5 h-5 flex-shrink-0" />
+            <Scan className="w-5 h-5 shrink-0" />
             {!sidebarCollapsed && <span className="text-sm font-medium truncate">QR Scanner</span>}
           </Link>
 
@@ -324,7 +335,7 @@ export default function AdminLayout({
               }
             `}
           >
-            <FileText className="w-5 h-5 flex-shrink-0" />
+            <FileText className="w-5 h-5 shrink-0" />
             {!sidebarCollapsed && <span className="text-sm font-medium truncate">Reports</span>}
           </Link>
 
@@ -337,7 +348,7 @@ export default function AdminLayout({
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
           >
-            <LogOut className="w-5 h-5 flex-shrink-0" />
+            <LogOut className="w-5 h-5 shrink-0" />
             {!sidebarCollapsed && <span className="text-sm font-medium truncate">Logout</span>}
           </button>
         </div>
@@ -358,6 +369,7 @@ export default function AdminLayout({
                 </button>
                 <h1 className="text-lg sm:text-xl font-bold text-gray-800 lg:hidden">
                   {pathname === '/admin/dashboard' && 'Dashboard'}
+                  {pathname === '/admin/profile' && 'My Profile'}
                   {pathname === '/admin/students' && 'Students'}
                   {pathname === '/admin/attendance/sessions' && 'Sessions'}
                   {pathname === '/admin/attendance/scanner' && 'QR Scanner'}
@@ -367,12 +379,12 @@ export default function AdminLayout({
               </div>
 
               <div className="flex items-center gap-4">
-                <div className="hidden md:flex items-center gap-3">
+                <div className="hidden md:flex items-center gap-3 cursor-pointer" onClick={() => router.push('/admin/profile')} title="Open profile">
                   <div className="text-right">
                     <p className="text-sm font-medium text-gray-900">{getAdminDisplayName()}</p>
                     <p className="text-xs text-gray-500">{admin?.role || 'Administrator'}</p>
                   </div>
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-full bg-linear-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
                     <User className="w-4 h-4 text-indigo-600" />
                   </div>
                 </div>
