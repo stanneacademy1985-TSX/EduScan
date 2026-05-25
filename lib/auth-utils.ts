@@ -1,105 +1,34 @@
-import { supabase } from './supabase'
+// src/lib/auth-utils.ts
+// Client-safe utilities only - no bcryptjs imports
 
-export interface AdminSessionUser {
-  id: string
-  email: string
-  full_name: string
-  role: 'super_admin' | 'admin' | 'teacher'
-  assigned_grade?: string | null
-  assigned_section?: string | null
-  profile_photo_base64?: string | null
-  is_active?: boolean
-}
-
-export const ADMIN_SESSION_KEY = 'admin_session'
-export const SUPER_ADMIN_SESSION_KEY = 'super_admin_session'
-
-export function isSuperAdmin(admin: AdminSessionUser | null | undefined) {
-  return admin?.role === 'super_admin'
-}
-
-export function getStoredAdminSession(): AdminSessionUser | null {
-  if (typeof window === 'undefined') return null
-
-  const superAdminSession = sessionStorage.getItem(SUPER_ADMIN_SESSION_KEY)
-  if (superAdminSession) {
-    try {
-      return JSON.parse(superAdminSession)
-    } catch {
-      sessionStorage.removeItem(SUPER_ADMIN_SESSION_KEY)
-    }
+export function validatePasswordStrength(password: string): {
+  isValid: boolean
+  errors: string[]
+} {
+  const errors: string[] = []
+  
+  if (password.length < 8) {
+    errors.push('Password must be at least 8 characters long')
   }
-
-  const adminSession = sessionStorage.getItem(ADMIN_SESSION_KEY)
-  if (adminSession) {
-    try {
-      return JSON.parse(adminSession)
-    } catch {
-      sessionStorage.removeItem(ADMIN_SESSION_KEY)
-    }
+  
+  if (!/[A-Z]/.test(password)) {
+    errors.push('Password must contain at least one uppercase letter')
   }
-
-  return null
-}
-
-export function storeAdminSession(admin: AdminSessionUser) {
-  if (typeof window === 'undefined') return
-
-  const sessionAdmin: AdminSessionUser = {
-    ...admin,
-    // Keep the session lightweight; the profile photo is always reloaded
-    // from the database and can be too large for browser storage quotas.
-    profile_photo_base64: null
+  
+  if (!/[a-z]/.test(password)) {
+    errors.push('Password must contain at least one lowercase letter')
   }
-
-  sessionStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(sessionAdmin))
-
-  if (admin.role === 'super_admin') {
-    sessionStorage.setItem(SUPER_ADMIN_SESSION_KEY, JSON.stringify(sessionAdmin))
-  } else {
-    sessionStorage.removeItem(SUPER_ADMIN_SESSION_KEY)
+  
+  if (!/\d/.test(password)) {
+    errors.push('Password must contain at least one number')
   }
-}
-
-export function clearAdminSessions() {
-  if (typeof window === 'undefined') return
-  sessionStorage.removeItem(ADMIN_SESSION_KEY)
-  sessionStorage.removeItem(SUPER_ADMIN_SESSION_KEY)
-  localStorage.removeItem('admin')
-}
-
-export function hasAssignedScope(admin: AdminSessionUser | null | undefined) {
-  return Boolean(admin && admin.role !== 'super_admin' && admin.assigned_grade)
-}
-
-export async function getAssignedStudentIds(admin: AdminSessionUser | null | undefined): Promise<string[] | null> {
-  if (!admin) return []
-  if (admin.role === 'super_admin') return null
-  if (!admin.id) return []
-
-  const { data, error } = await supabase
-    .from('student_teacher_assignments')
-    .select('student_id')
-    .eq('teacher_id', admin.id)
-
-  if (error) {
-    throw error
+  
+  if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+    errors.push('Password must contain at least one special character')
   }
-
-  return (data || []).map((row: { student_id: string }) => row.student_id)
-}
-
-export async function fetchAdminById(id: string): Promise<AdminSessionUser | null> {
-  const { data, error } = await supabase
-    .from('admin_users')
-    .select('id, email, full_name, role, assigned_grade, assigned_section, profile_photo_base64, is_active')
-    .eq('id', id)
-    .eq('is_active', true)
-    .single()
-
-  if (error) {
-    return null
+  
+  return {
+    isValid: errors.length === 0,
+    errors
   }
-
-  return data
 }

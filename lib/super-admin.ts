@@ -1,6 +1,5 @@
 // src/lib/super-admin.ts
 import { supabase } from './supabase'
-import { hashPassword } from './auth-utils'
 
 export interface AdminUser {
   id: string
@@ -97,6 +96,9 @@ export class SuperAdminService {
     assignedGrade?: string,
     assignedSection?: string
   ): Promise<AdminUser> {
+    // Dynamically import server-only auth utilities
+    const { hashPassword } = await import('./auth-utils-server')
+    
     // Hash the password
     const hashedPassword = await hashPassword(password)
     

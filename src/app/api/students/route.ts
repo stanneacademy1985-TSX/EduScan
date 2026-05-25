@@ -1,6 +1,8 @@
+export const runtime = 'nodejs'
+
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { hashPassword } from '../../../../lib/auth-utils'
+import { hashPassword } from '../../../../lib/auth-utils-server'
 import { generateEncryptedQRCode } from '../../../../lib/qr-generator'
 import { ValidationError, validateLrn } from '../../../../lib/lrn-validation'
 
