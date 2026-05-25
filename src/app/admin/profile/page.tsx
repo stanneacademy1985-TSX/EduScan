@@ -15,6 +15,38 @@ interface ProfileForm {
   profile_photo_base64?: string | null
 }
 
+async function compressProfilePhoto(file: File, maxSize = 768, quality = 0.82): Promise<string> {
+  const imageUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result || ''))
+    reader.onerror = () => reject(new Error('Failed to read image file'))
+    reader.readAsDataURL(file)
+  })
+
+  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const element = new Image()
+    element.onload = () => resolve(element)
+    element.onerror = () => reject(new Error('Failed to load image'))
+    element.src = imageUrl
+  })
+
+  const scale = Math.min(1, maxSize / Math.max(image.width, image.height))
+  const width = Math.max(1, Math.round(image.width * scale))
+  const height = Math.max(1, Math.round(image.height * scale))
+
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+
+  const context = canvas.getContext('2d')
+  if (!context) {
+    throw new Error('Could not process profile photo')
+  }
+
+  context.drawImage(image, 0, 0, width, height)
+  return canvas.toDataURL('image/jpeg', quality)
+}
+
 export default function AdminProfilePage() {
   const router = useRouter()
   const [admin, setAdmin] = useState<AdminSessionUser | null>(null)
@@ -130,7 +162,13 @@ export default function AdminProfilePage() {
 
       setAdmin(updatedAdmin)
       storeAdminSession(updatedAdmin)
-      localStorage.setItem('admin', JSON.stringify(updatedAdmin))
+      localStorage.setItem(
+        'admin',
+        JSON.stringify({
+          ...updatedAdmin,
+          profile_photo_base64: updatedAdmin.profile_photo_base64 ? '[stored in session]' : null
+        })
+      )
       setMessage({ type: 'success', text: 'Profile updated successfully.' })
     } catch (error) {
       console.error('Error updating profile:', error)
@@ -272,12 +310,16 @@ export default function AdminProfilePage() {
                   onChange={async (e) => {
                     const file = e.target.files?.[0]
                     if (!file) return
-                    const reader = new FileReader()
-                    reader.onload = () => {
-                      const result = reader.result as string
-                      setForm(prev => ({ ...prev, profile_photo_base64: result }))
+                    try {
+                      const compressedPhoto = await compressProfilePhoto(file)
+                      setForm(prev => ({ ...prev, profile_photo_base64: compressedPhoto }))
+                    } catch (error) {
+                      console.error('Failed to process profile photo:', error)
+                      setMessage({
+                        type: 'error',
+                        text: error instanceof Error ? error.message : 'Failed to process profile photo'
+                      })
                     }
-                    reader.readAsDataURL(file)
                   }}
                   className="w-full text-sm text-slate-600 file:mr-4 file:rounded-xl file:border-0 file:bg-indigo-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-indigo-700 sm:w-auto"
                 />
