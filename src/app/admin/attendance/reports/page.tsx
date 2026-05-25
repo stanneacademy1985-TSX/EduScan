@@ -390,7 +390,7 @@ export default function AttendanceReportsPage() {
       }
 
       const learnerEntry = learners.get(record.student_id)!
-      const timeSeconds = parseTimeInHeconds(record.time_in || '00:00:00')
+      const timeSeconds = parseTimeInHconds(record.time_in || '00:00:00')
       const currentEntry = learnerEntry.latestByDate.get(record.date)
 
       if (!currentEntry || timeSeconds >= currentEntry.timeSeconds) {
@@ -818,7 +818,7 @@ export default function AttendanceReportsPage() {
     setTeacherHummaries(summaries)
   }
 
-  const parseTimeInHeconds = (time: string) => {
+  const parseTimeInHconds = (time: string) => {
     const parts = time.split(':').map(Number)
     if (parts.length !== 3) return 0
     return parts[0] * 3600 + parts[1] * 60 + parts[2]
@@ -836,11 +836,11 @@ export default function AttendanceReportsPage() {
     }, {} as Record<string, AttendanceRecord[]>)
 
     Object.values(grouped).forEach(bucket => {
-      const sorted = [...bucket].sort((a, b) => parseTimeInHeconds(a.time_in) - parseTimeInHeconds(b.time_in))
+      const sorted = [...bucket].sort((a, b) => parseTimeInHconds(a.time_in) - parseTimeInHconds(b.time_in))
       for (let i = 0; i < sorted.length - 1; i++) {
         const current = sorted[i]
         const next = sorted[i + 1]
-        const deltaSeconds = Math.abs(parseTimeInHeconds(next.time_in) - parseTimeInHeconds(current.time_in))
+        const deltaSeconds = Math.abs(parseTimeInHconds(next.time_in) - parseTimeInHconds(current.time_in))
         if (current.student_id !== next.student_id && deltaSeconds <= 15) {
           pockets.push({
             date: current.date,
@@ -1122,7 +1122,7 @@ export default function AttendanceReportsPage() {
     doc.text('School Name', left + 2, headerTop + 3)
     doc.text('School Year', left + halfWidth + 2, headerTop + 3)
     doc.text('Grade Level', left + 2, headerTop + rowHeight + 3)
-    doc.text('Section', left + halfWidth + 2, headerTop + rowHeight + 3)
+    doc.text('Section / Adviser', left + halfWidth + 2, headerTop + rowHeight + 3)
 
     doc.setFont('helvetica', 'normal')
     doc.text(process.env.NEXT_PUBLIC_SCHOOL_NAME || '______________________________', left + 22, headerTop + 3)
@@ -1577,27 +1577,63 @@ export default function AttendanceReportsPage() {
         doc.setFontSize(7.5)
         doc.text('Official SF2-style attendance layout generated from the selected filters', pageWidth / 2, 18, { align: 'center' })
 
+        // --- FIXED HEADER SECTION ---
+        // Clear previous drawings and draw a clean header box with proper spacing
         doc.setDrawColor(0, 0, 0)
         doc.setLineWidth(0.15)
-        doc.rect(marginX, 22.5, pageWidth - marginX * 2, 13)
-        doc.line(pageWidth / 2, 22.5, pageWidth / 2, 35.5)
-        doc.line(marginX, 29, pageWidth - marginX, 29)
+        const headerBoxHeight = 30  // Increased height to prevent overlap
+        const headerBoxY = 24
+        doc.rect(marginX, headerBoxY, pageWidth - marginX * 2, headerBoxHeight)
+        
+        // Draw internal vertical and horizontal dividers
+        const midX = pageWidth / 2
+        const firstRowY = headerBoxY + 8
+        const secondRowY = headerBoxY + 18
+        
+        // Vertical divider
+        doc.line(midX, headerBoxY, midX, headerBoxY + headerBoxHeight)
+        // Horizontal divider
+        doc.line(marginX, secondRowY, pageWidth - marginX, secondRowY)
 
-        doc.setFontSize(7.5)
+        // Row 1: School Name | School Year
+        doc.setFontSize(8)
         doc.setFont('helvetica', 'bold')
-        doc.text('School Name', marginX + 2, 26)
-        doc.text('School Year', pageWidth / 2 + 2, 26)
-        doc.text('Grade Level', marginX + 2, 32.5)
-        doc.text('Section / Adviser', pageWidth / 2 + 2, 32.5)
-
+        doc.text('School Name', marginX + 3, firstRowY + 1)
+        doc.text('School Year', midX + 3, firstRowY + 1)
+        
         doc.setFont('helvetica', 'normal')
-        doc.text(process.env.NEXT_PUBLIC_SCHOOL_NAME || 'Saint Anne Academy', marginX + 18, 26)
-        doc.text(getSchoolYearLabel(dateRange.start) || '________________', pageWidth / 2 + 18, 26)
-        doc.text(`Grade ${group.grade}`, marginX + 18, 32.5)
-        doc.text(`${group.section} / ${group.adviser}`, pageWidth / 2 + 18, 32.5, { maxWidth: (pageWidth / 2) - 20 })
+        const schoolName = process.env.NEXT_PUBLIC_SCHOOL_NAME || 'Saint Anne Academy'
+        doc.text(schoolName, marginX + 22, firstRowY + 1)
+        doc.text(getSchoolYearLabel(dateRange.start) || '________________', midX + 22, firstRowY + 1)
+
+        // Row 2: Grade Level | Section / Adviser
+        doc.setFont('helvetica', 'bold')
+        doc.text('Grade Level', marginX + 3, secondRowY + 1)
+        doc.text('Section / Adviser', midX + 3, secondRowY + 1)
+        
+        doc.setFont('helvetica', 'normal')
+        doc.text(`Grade ${group.grade}`, marginX + 22, secondRowY + 1)
+        const adviserText = `${group.section} / ${group.adviser}`
+        // Allow more space for adviser text, wrap if needed
+        const maxAdviserWidth = (pageWidth / 2) - 35
+        doc.text(adviserText, midX + 28, secondRowY + 1, { maxWidth: maxAdviserWidth })
+
+        // Row 3: Report Month | Class Adviser (added for completeness)
+        const thirdRowY = headerBoxY + 24
+        doc.setFont('helvetica', 'bold')
+        doc.text('Report Month', marginX + 3, thirdRowY + 1)
+        doc.text('Class Adviser', midX + 3, thirdRowY + 1)
+        
+        doc.setFont('helvetica', 'normal')
+        doc.text(reportMonthLabel, marginX + 22, thirdRowY + 1)
+        doc.text(group.adviser, midX + 28, thirdRowY + 1, { maxWidth: maxAdviserWidth })
+        // --- END FIXED HEADER SECTION ---
+
+        // Adjust table start Y to be below the new taller header
+        const adjustedTableTop = headerBoxY + headerBoxHeight + 4
 
         const tableOptions: any = {
-          startY: tableTop,
+          startY: adjustedTableTop,
           head: [[
             'No.',
             "Learner's Name",
@@ -1633,7 +1669,7 @@ export default function AttendanceReportsPage() {
             [dateHeaders.length + 3]: { cellWidth: 10, halign: 'center' },
             [dateHeaders.length + 4]: { cellWidth: remarksWidth, halign: 'left' }
           },
-          margin: { left: marginX, right: marginX, top: tableTop, bottom: footerReserve },
+          margin: { left: marginX, right: marginX, top: adjustedTableTop, bottom: footerReserve },
           didParseCell: (data: any) => {
             const rawRow = data.row.raw as any
 
@@ -1654,8 +1690,8 @@ export default function AttendanceReportsPage() {
 
         doc.setDrawColor(0, 0, 0)
         doc.setLineWidth(0.15)
-        // increase footer box height to fit guidelines
-        doc.rect(marginX, footerTop, pageWidth - marginX * 2, 40)
+        // Increase footer box height to fit guidelines
+        doc.rect(marginX, footerTop, pageWidth - marginX * 2, 45)
 
         doc.setFontSize(8)
         doc.setFont('helvetica', 'bold')
@@ -2385,7 +2421,7 @@ export default function AttendanceReportsPage() {
                                   </tr>
                                 ))}
                               </tbody>
-                            </table>
+                            <table>
                           </div>
 
                           {/* Mobile Card View */}
