@@ -1130,14 +1130,24 @@ export default function AttendanceReportsPage() {
                 </BarChart>
               )}
               {chartType === 'pie' && (
-                <RePieChart>
-                  <Pie data={getChartData()} cx="50%" cy="50%" labelLine={false} label={({ name, percent }) => `${name}: ${(percent! * 100).toFixed(0)}%`} outerRadius={150} dataKey="value">
-                    {getChartData().map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </RePieChart>
-              )}
+  <RePieChart>
+    <Pie 
+      data={getChartData()} 
+      cx="50%" 
+      cy="50%" 
+      labelLine={false} 
+      label={({ name, percent }) => `${name}: ${(percent! * 100).toFixed(0)}%`} 
+      outerRadius={150} 
+      dataKey="value"
+    >
+      {(getChartData() as Array<{name: string; value: number; color: string}>).map((entry, index) => (
+        <Cell key={`cell-${index}`} fill={entry.color} />
+      ))}
+    </Pie>
+    <Tooltip />
+    <Legend />
+  </RePieChart>
+)}
             </ResponsiveContainer>
           </div>
         )}
