@@ -76,6 +76,25 @@ interface Student {
   previous_shs?: string | null
 }
 
+// Helper function to format name with middle initial
+const formatFullName = (firstName: string, middleName: string | null, lastName: string): string => {
+  const first = firstName.trim()
+  const last = lastName.trim()
+  
+  if (middleName && middleName.trim()) {
+    // Get middle initial (first letter of middle name)
+    const middleInitial = middleName.trim().charAt(0).toUpperCase()
+    return `${first} ${middleInitial}. ${last}`
+  }
+  
+  return `${first} ${last}`
+}
+
+// Helper function to get display name from student object
+const getDisplayName = (student: Student): string => {
+  return formatFullName(student.first_name, student.middle_name, student.last_name)
+}
+
 export default function StudentsPage() {
   const router = useRouter()
   const [admin, setAdmin] = useState<AdminSessionUser | null>(null)
@@ -195,7 +214,7 @@ export default function StudentsPage() {
         student.first_name.toLowerCase().includes(term) ||
         student.last_name.toLowerCase().includes(term) ||
         student.email.toLowerCase().includes(term) ||
-        student.full_name.toLowerCase().includes(term)
+        getDisplayName(student).toLowerCase().includes(term)
       )
     }
 
@@ -276,7 +295,7 @@ export default function StudentsPage() {
           student[header] = (values[index] || '').trim()
         })
 
-        const fullName = `${student.first_name || ''} ${student.middle_name ? student.middle_name + ' ' : ''}${student.last_name || ''}`.trim()
+        const fullName = formatFullName(student.first_name || '', student.middle_name || null, student.last_name || '')
         return {
           ...student,
           section: 'SHS',
@@ -317,7 +336,7 @@ export default function StudentsPage() {
     const csvData = filteredStudents.map(student => [
       // Force LRN to be treated as text by adding equals sign and quotes
       `="${student.lrn}"`,
-      student.full_name,
+      getDisplayName(student),
       student.grade,
       student.email,
       student.contact_number,
@@ -437,12 +456,20 @@ export default function StudentsPage() {
     setMessage({ type: '', text: '' })
 
     try {
+      // Calculate the formatted full name
+      const formattedFullName = formatFullName(
+        editedStudent.first_name || selectedStudent.first_name,
+        editedStudent.middle_name || selectedStudent.middle_name,
+        editedStudent.last_name || selectedStudent.last_name
+      )
+
       const { error } = await supabase
         .from('students')
         .update({
           first_name: editedStudent.first_name,
           middle_name: editedStudent.middle_name,
           last_name: editedStudent.last_name,
+          full_name: formattedFullName,
           contact_number: editedStudent.contact_number,
           address: editedStudent.address,
           date_of_birth: editedStudent.date_of_birth,
@@ -467,12 +494,18 @@ export default function StudentsPage() {
 
       if (error) throw error
 
-      // Update in students list
+      // Update in students list with formatted name
+      const updatedStudent = { 
+        ...selectedStudent, 
+        ...editedStudent,
+        full_name: formattedFullName
+      }
+      
       setStudents(prev => prev.map(s => 
-        s.id === selectedStudent.id ? { ...s, ...editedStudent } : s
+        s.id === selectedStudent.id ? updatedStudent : s
       ))
 
-      setSelectedStudent(prev => prev ? { ...prev, ...editedStudent } : null)
+      setSelectedStudent(updatedStudent)
       
       setIsEditing(false)
       setMessage({ type: 'success', text: 'Student information updated successfully!' })
@@ -658,7 +691,7 @@ export default function StudentsPage() {
                     {student.profile_photo_base64 || student.profile_photo_url ? (
                       <img
                         src={student.profile_photo_base64 || student.profile_photo_url || ''}
-                        alt={student.full_name}
+                        alt={getDisplayName(student)}
                         className="w-12 h-12 rounded-full object-cover"
                       />
                     ) : (
@@ -666,7 +699,7 @@ export default function StudentsPage() {
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-gray-900 truncate">{student.full_name}</p>
+                    <p className="font-semibold text-gray-900 truncate">{getDisplayName(student)}</p>
                     <p className="text-xs text-gray-500 truncate">{student.email}</p>
                     <p className="text-xs text-gray-600 mt-1">LRN: {student.lrn}</p>
                     <p className="text-xs text-gray-600">Grade {student.grade}</p>
@@ -752,7 +785,7 @@ export default function StudentsPage() {
                           {student.profile_photo_base64 || student.profile_photo_url ? (
                             <img 
                               src={student.profile_photo_base64 || student.profile_photo_url || ''} 
-                              alt={student.full_name}
+                              alt={getDisplayName(student)}
                               className="w-12 h-12 rounded-full object-cover"
                             />
                           ) : (
@@ -760,7 +793,7 @@ export default function StudentsPage() {
                           )}
                         </div>
                         <div className="min-w-0">
-                          <p className="font-semibold text-gray-900 truncate">{student.full_name}</p>
+                          <p className="font-semibold text-gray-900 truncate">{getDisplayName(student)}</p>
                           <p className="text-sm text-gray-500 flex items-center gap-1 mt-0.5 max-w-42.5 sm:max-w-60 truncate">
                             <Mail className="w-3.5 h-3.5 shrink-0" />
                             {student.email}
@@ -942,7 +975,7 @@ export default function StudentsPage() {
                         {(selectedStudent.profile_photo_base64 || selectedStudent.profile_photo_url) ? (
                           <img 
                             src={selectedStudent.profile_photo_base64 || selectedStudent.profile_photo_url || ''} 
-                            alt={selectedStudent.full_name}
+                            alt={getDisplayName(selectedStudent)}
                             className="w-full h-full object-cover"
                           />
                         ) : (
@@ -980,7 +1013,14 @@ export default function StudentsPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="text-xl sm:text-2xl font-bold text-gray-900 wrap-break-word">
-                    {isEditing ? editedStudent.full_name || selectedStudent.full_name : selectedStudent.full_name}
+                    {isEditing 
+                      ? formatFullName(
+                          editedStudent.first_name || selectedStudent.first_name,
+                          editedStudent.middle_name || selectedStudent.middle_name,
+                          editedStudent.last_name || selectedStudent.last_name
+                        )
+                      : getDisplayName(selectedStudent)
+                    }
                   </h3>
                   <p className="text-gray-600 flex items-center gap-2 mt-1 flex-wrap">
                     <span className="font-mono bg-gray-100 px-3 py-1 rounded-lg text-xs sm:text-sm">
@@ -1008,7 +1048,7 @@ export default function StudentsPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mt-4">
                       <div>
                         <p className="text-xs font-medium text-gray-500 uppercase">Full Name</p>
-                        <p className="text-base font-semibold text-gray-900 mt-1">{selectedStudent.full_name}</p>
+                        <p className="text-base font-semibold text-gray-900 mt-1">{getDisplayName(selectedStudent)}</p>
                       </div>
                       <div>
                         <p className="text-xs font-medium text-gray-500 uppercase">Email</p>
@@ -1223,6 +1263,7 @@ export default function StudentsPage() {
                             className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
                             placeholder="Enter middle name"
                           />
+                          <p className="text-xs text-gray-500">Will be displayed as middle initial (e.g., John M. Doe)</p>
                         </div>
 
                         <div className="space-y-2">
