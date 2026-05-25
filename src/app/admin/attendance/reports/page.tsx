@@ -2421,9 +2421,8 @@ export default function AttendanceReportsPage() {
                                   </tr>
                                 ))}
                               </tbody>
-                            <table>
+                            </table>
                           </div>
-
                           {/* Mobile Card View */}
                           <div className="space-y-3 md:hidden">
                             {grade12Students.map((student) => (
