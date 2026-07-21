@@ -1,58 +1,73 @@
 // src/lib/auth-utils.ts
-// Client-safe utilities - no bcryptjs imports
+import bcrypt from 'bcryptjs'
 
-export function validatePasswordStrength(password: string): {
-  isValid: boolean
-  errors: string[]
-} {
-  const errors: string[] = []
-  
-  if (password.length < 8) {
-    errors.push('Password must be at least 8 characters long')
+export class AuthUtils {
+  private static readonly SALT_ROUNDS = 10
+
+  // Hash a password
+  static async hashPassword(password: string): Promise<string> {
+    try {
+      const hashed = await bcrypt.hash(password, this.SALT_ROUNDS)
+      console.log('Password hashed successfully, length:', hashed.length)
+      return hashed
+    } catch (error) {
+      console.error('Error hashing password:', error)
+      throw new Error('Failed to hash password')
+    }
   }
-  
-  if (!/[A-Z]/.test(password)) {
-    errors.push('Password must contain at least one uppercase letter')
+
+  // Compare password with hash
+  static async verifyPassword(password: string, hash: string): Promise<boolean> {
+    try {
+      if (!hash || typeof hash !== 'string') {
+        console.error('Invalid hash provided')
+        return false
+      }
+      
+      const isValid = await bcrypt.compare(password, hash)
+      console.log('Password verification result:', isValid)
+      return isValid
+    } catch (error) {
+      console.error('Error verifying password:', error)
+      return false
+    }
   }
-  
-  if (!/[a-z]/.test(password)) {
-    errors.push('Password must contain at least one lowercase letter')
-  }
-  
-  if (!/\d/.test(password)) {
-    errors.push('Password must contain at least one number')
-  }
-  
-  if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
-    errors.push('Password must contain at least one special character')
-  }
-  
-  return {
-    isValid: errors.length === 0,
-    errors
+
+  // Validate password strength (for student registration)
+  static validatePasswordStrength(password: string): {
+    isValid: boolean
+    errors: string[]
+  } {
+    const errors: string[] = []
+    
+    if (password.length < 8) {
+      errors.push('Password must be at least 8 characters long')
+    }
+    
+    if (!/[A-Z]/.test(password)) {
+      errors.push('Password must contain at least one uppercase letter')
+    }
+    
+    if (!/[a-z]/.test(password)) {
+      errors.push('Password must contain at least one lowercase letter')
+    }
+    
+    if (!/\d/.test(password)) {
+      errors.push('Password must contain at least one number')
+    }
+    
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+      errors.push('Password must contain at least one special character')
+    }
+    
+    return {
+      isValid: errors.length === 0,
+      errors
+    }
   }
 }
 
-// Simple hash function for client-side (for demonstration/UI purposes only)
-// Note: Actual password hashing should be done server-side with bcrypt
-export async function hashPassword(password: string): Promise<string> {
-  // For UI purposes only - this is NOT secure for production
-  // In a real app, passwords should be hashed on the server
-  // This is just to prevent the build error
-  return `hashed_${Buffer.from(password).toString('base64')}`
-}
-
-// Simple verify function for client-side
-export async function verifyPassword(plainPassword: string, hashedPassword: string): Promise<boolean> {
-  // For UI purposes only - this is NOT secure for production
-  // In a real app, password verification should happen on the server
-  const expectedHash = `hashed_${Buffer.from(plainPassword).toString('base64')}`
-  return expectedHash === hashedPassword
-}
-
-// AuthUtils object for backward compatibility
-export const AuthUtils = {
-  validatePasswordStrength,
-  hashPassword,
-  verifyPassword
-}
+// Export individual functions for easier imports
+export const hashPassword = AuthUtils.hashPassword.bind(AuthUtils)
+export const verifyPassword = AuthUtils.verifyPassword.bind(AuthUtils)
+export const validatePasswordStrength = AuthUtils.validatePasswordStrength.bind(AuthUtils)
