@@ -7,6 +7,7 @@ export interface AdminSessionUser {
   role: 'super_admin' | 'admin' | 'teacher'
   assigned_grade?: string | null
   assigned_section?: string | null
+  profile_photo_base64?: string | null
   is_active?: boolean
 }
 
@@ -44,10 +45,16 @@ export function getStoredAdminSession(): AdminSessionUser | null {
 export function storeAdminSession(admin: AdminSessionUser) {
   if (typeof window === 'undefined') return
 
-  sessionStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(admin))
+  const sessionAdmin: AdminSessionUser = {
+    ...admin,
+    // Keep the session lightweight; profile photos are reloaded from the database.
+    profile_photo_base64: null
+  }
+
+  sessionStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(sessionAdmin))
 
   if (admin.role === 'super_admin') {
-    sessionStorage.setItem(SUPER_ADMIN_SESSION_KEY, JSON.stringify(admin))
+    sessionStorage.setItem(SUPER_ADMIN_SESSION_KEY, JSON.stringify(sessionAdmin))
   } else {
     sessionStorage.removeItem(SUPER_ADMIN_SESSION_KEY)
   }
@@ -84,7 +91,7 @@ export async function getAssignedStudentIds(admin: AdminSessionUser | null | und
 export async function fetchAdminById(id: string): Promise<AdminSessionUser | null> {
   const { data, error } = await supabase
     .from('admin_users')
-    .select('id, email, full_name, role, assigned_grade, assigned_section, is_active')
+    .select('id, email, full_name, role, assigned_grade, assigned_section, profile_photo_base64, is_active')
     .eq('id', id)
     .eq('is_active', true)
     .single()
