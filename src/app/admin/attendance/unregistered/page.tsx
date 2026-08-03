@@ -99,6 +99,12 @@ export default function UnregisteredStudentsPage() {
       return
     }
 
+    if (!/^\d{12}$/.test(lrn)) {
+      setMessage('LRN must be exactly 12 digits.')
+      setMessageType('error')
+      return
+    }
+
     setSubmitting(true)
 
     try {
@@ -163,7 +169,7 @@ export default function UnregisteredStudentsPage() {
       <div className="rounded-2xl border border-slate-200 bg-linear-to-br from-white to-orange-50 p-4 sm:p-6 shadow-sm">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 leading-tight">Unregistered Students</h1>
         <p className="text-sm sm:text-base text-gray-600 mt-1 max-w-2xl">
-          Enter the student's LRN and name to create a temporary attendance record.
+          Enter the student&apos;s LRN and name to create a temporary attendance record.
         </p>
       </div>
 
@@ -197,6 +203,9 @@ export default function UnregisteredStudentsPage() {
             <label className="block text-sm font-medium text-gray-700 mb-2">LRN</label>
             <input
               type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={12}
               value={formData.lrn}
               onChange={(e) => setFormData(prev => ({ ...prev, lrn: e.target.value }))}
               placeholder="Enter LRN"
@@ -320,7 +329,7 @@ export default function UnregisteredStudentsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 text-sm text-blue-700">
           <div className="flex items-start gap-2">
             <div className="w-5 h-5 rounded-full bg-blue-200 text-blue-800 flex items-center justify-center shrink-0 text-xs font-bold">1</div>
-            <span>Teacher enters the unregistered student's LRN and name here</span>
+            <span>Teacher enters the unregistered student&apos;s LRN and name here</span>
           </div>
           <div className="flex items-start gap-2">
             <div className="w-5 h-5 rounded-full bg-blue-200 text-blue-800 flex items-center justify-center shrink-0 text-xs font-bold">2</div>
