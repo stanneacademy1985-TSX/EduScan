@@ -531,6 +531,16 @@ export default function LoginPage() {
                 <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
               </Link>
             </div>
+
+            <div className="mt-6 text-center text-sm text-gray-500">
+              <span className="mr-1">Teacher or admin?</span>
+              <Link
+                href="/admin/login"
+                className="font-medium text-blue-600 hover:text-blue-800"
+              >
+                Admin Login
+              </Link>
+            </div>
           </form>
 
           {/* Mobile Back to home */}
