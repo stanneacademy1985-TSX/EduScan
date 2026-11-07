@@ -102,6 +102,8 @@ export default function RegisterPage() {
   const [mobileLogoError, setMobileLogoError] = useState(false)
   const [desktopLogoError, setDesktopLogoError] = useState(false)
   const [isCompressing, setIsCompressing] = useState(false)
+  const [showPasswordWarning, setShowPasswordWarning] = useState(false)
+  const [passwordWarningShown, setPasswordWarningShown] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -121,14 +123,11 @@ export default function RegisterPage() {
   const capitalizeName = (name: string): string => {
     if (!name) return name
     
-    // Split by spaces and capitalize each part
     return name
       .toLowerCase()
       .split(' ')
       .map(word => {
         if (word.length === 0) return word
-        // Handle special cases like "Dela Cruz" -> "Dela Cruz" (keep Dela as is)
-        // But ensure first letter is capitalized
         return word.charAt(0).toUpperCase() + word.slice(1)
       })
       .join(' ')
@@ -136,9 +135,19 @@ export default function RegisterPage() {
 
   // Handle name changes with automatic capitalization
   const handleNameChange = (field: 'firstName' | 'middleName' | 'lastName', value: string) => {
-    // Allow spaces but apply capitalization
     const capitalizedValue = capitalizeName(value)
     setFormData(prev => ({ ...prev, [field]: capitalizedValue }))
+  }
+
+  // Helper function to check password requirements
+  const getPasswordRequirements = (password: string) => {
+    return [
+      { label: 'At least 8 characters', met: password.length >= 8 },
+      { label: 'One uppercase letter', met: /[A-Z]/.test(password) },
+      { label: 'One lowercase letter', met: /[a-z]/.test(password) },
+      { label: 'One number', met: /\d/.test(password) },
+      { label: 'One special character', met: /[!@#$%^&*(),.?":{}|<>]/.test(password) },
+    ]
   }
 
   const grades = ['11', '12']
@@ -187,6 +196,14 @@ export default function RegisterPage() {
           setError('LRN must be exactly 12 digits')
           return false
         }
+        
+        // Check password strength and show warning modal
+        const passwordValidation = AuthUtils.validatePasswordStrength(formData.password)
+        if (!passwordValidation.isValid) {
+          setError('') // Clear generic error, show modal instead
+          setShowPasswordWarning(true)
+          return false
+        }
         break
     }
     return true
@@ -204,8 +221,7 @@ export default function RegisterPage() {
           let width = img.width
           let height = img.height
           
-          // Calculate new dimensions while maintaining aspect ratio
-          const maxDimension = 1200 // Max width or height
+          const maxDimension = 1200
           if (width > height && width > maxDimension) {
             height = (height * maxDimension) / width
             width = maxDimension
@@ -225,7 +241,6 @@ export default function RegisterPage() {
           
           ctx.drawImage(img, 0, 0, width, height)
           
-          // Try to compress to JPEG with reducing quality until size is under limit
           let quality = 0.8
           const tryCompress = () => {
             canvas.toBlob(
@@ -238,18 +253,15 @@ export default function RegisterPage() {
                 const maxSize = maxSizeMB * 1024 * 1024
                 
                 if (blob.size > maxSize && quality > 0.1) {
-                  // Reduce quality and try again
                   quality -= 0.1
                   tryCompress()
                 } else if (blob.size > maxSize) {
-                  // If still too big, reduce dimensions
                   canvas.width = Math.round(width * 0.7)
                   canvas.height = Math.round(height * 0.7)
                   ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
                   quality = 0.6
                   tryCompress()
                 } else {
-                  // Create new file from blob
                   const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, '.jpg'), {
                     type: 'image/jpeg',
                     lastModified: Date.now()
@@ -278,15 +290,12 @@ export default function RegisterPage() {
     const file = e.target.files?.[0]
     if (!file) return
 
-    // Reset error and clear previous state
     setError('')
     setIsCompressing(true)
     
     try {
-      // Validate file type
       const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif']
       if (!validTypes.includes(file.type) && file.type !== '') {
-        // Some mobile browsers don't send file type, so check extension
         const extension = file.name.split('.').pop()?.toLowerCase()
         const validExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif']
         if (!extension || !validExtensions.includes(extension)) {
@@ -298,7 +307,6 @@ export default function RegisterPage() {
       
       let processedFile = file
       
-      // Compress image if larger than 1MB
       if (file.size > 1 * 1024 * 1024) {
         try {
           setUploadProgress(25)
@@ -306,16 +314,13 @@ export default function RegisterPage() {
           setUploadProgress(75)
         } catch (compressError) {
           console.warn('Image compression failed, using original:', compressError)
-          // Continue with original file
         }
       }
       
-      // Clear any previous preview
       if (previewUrl) {
         URL.revokeObjectURL(previewUrl)
       }
       
-      // Create preview URL
       const url = URL.createObjectURL(processedFile)
       setPreviewUrl(url)
       setFormData(prev => ({ ...prev, profilePhoto: processedFile }))
@@ -342,10 +347,8 @@ export default function RegisterPage() {
     setUploadProgress(0)
   }
 
-  // Helper function to convert file to base64 with error handling
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
-      // Check if file is valid
       if (!file || file.size === 0) {
         reject(new Error('Invalid or empty file'))
         return
@@ -371,7 +374,6 @@ export default function RegisterPage() {
         reject(new Error('File reading was aborted'))
       }
 
-      // Read the file
       try {
         reader.readAsDataURL(file)
       } catch (err) {
@@ -420,7 +422,6 @@ export default function RegisterPage() {
       return
     }
 
-    // Validate password strength
     const passwordValidation = AuthUtils.validatePasswordStrength(formData.password)
     if (!passwordValidation.isValid) {
       setError(`Password requirements: ${passwordValidation.errors.join(', ')}`)
@@ -432,27 +433,21 @@ export default function RegisterPage() {
     setError('')
 
     try {
-      // Hash the password
       const hashedPassword = await AuthUtils.hashPassword(formData.password)
       
-      // Convert profile photo to base64 if exists - with improved error handling
       let photoBase64 = null
       if (formData.profilePhoto) {
         try {
           photoBase64 = await fileToBase64(formData.profilePhoto)
         } catch (photoError: any) {
-          // Log the error but allow registration to continue without photo
           console.error('Photo conversion failed:', photoError)
           setError('Failed to process profile photo. Registration will continue without it.')
-          // Continue without photo
         }
       }
 
-      // Generate encrypted QR code automatically
       setQrGenerating(true)
       const qrCodeData = await generateEncryptedQRCode(formData.lrn)
 
-      // Ensure names are properly capitalized before submitting
       const capitalizedFirstName = capitalizeName(formData.firstName)
       const capitalizedMiddleName = capitalizeName(formData.middleName)
       const capitalizedLastName = capitalizeName(formData.lastName)
@@ -460,17 +455,14 @@ export default function RegisterPage() {
       const capitalizedMotherName = capitalizeName(formData.motherName)
       const capitalizedGuardianName = capitalizeName(formData.guardianName)
 
-      // Insert with hashed password and base64 photo
       const { data, error: dbError } = await supabase
         .from('students')
         .insert([
           {
-            // Account Credentials
             lrn: formData.lrn,
             email: formData.email,
             password_hash: hashedPassword,
             
-            // Personal Information
             first_name: capitalizedFirstName,
             middle_name: capitalizedMiddleName,
             last_name: capitalizedLastName,
@@ -480,13 +472,11 @@ export default function RegisterPage() {
             address: formData.address,
             profile_photo_base64: photoBase64,
             
-            // Education Background
             grade: formData.currentGrade,
             section: 'SHS',
             previous_elementary: formData.previousElementary,
             previous_high_school: formData.previousHighSchool || null,
             
-            // Parents Information
             father_name: capitalizedFatherName || null,
             father_occupation: formData.fatherOccupation || null,
             mother_name: capitalizedMotherName || null,
@@ -494,13 +484,11 @@ export default function RegisterPage() {
             guardian_name: capitalizedGuardianName || null,
             guardian_contact: formData.guardianContact || null,
             
-            // Medical Background
             medical_conditions: formData.medicalConditions || null,
             medications: formData.medications || null,
             allergies: formData.allergies || null,
             emergency_contact: formData.emergencyContact,
             
-            // System Information
             qr_code_data: qrCodeData,
             is_active: true
           }
@@ -551,7 +539,6 @@ export default function RegisterPage() {
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-3">Profile Photo (Optional)</label>
               <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
-                {/* Photo Preview/Upload Area */}
                 <div className="shrink-0">
                   {previewUrl ? (
                     <div className="relative">
@@ -561,7 +548,6 @@ export default function RegisterPage() {
                           alt="Profile preview" 
                           className="w-full h-full object-cover"
                           onError={(e) => {
-                            // Fallback for broken image preview
                             setError('Failed to load image preview')
                             removePhoto()
                           }}
@@ -598,7 +584,6 @@ export default function RegisterPage() {
                   )}
                 </div>
 
-                {/* Upload Info */}
                 <div className="flex-1">
                   <div className="space-y-3">
                     <div>
@@ -645,7 +630,6 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            {/* Name fields with capitalization */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">First Name *</label>
@@ -1026,6 +1010,19 @@ export default function RegisterPage() {
               </div>
               <div>
                 <div className="mb-2">
+                  {/* Mobile-only warning banner */}
+                  <div className="md:hidden mb-3 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                      <div>
+                        <p className="text-xs font-semibold text-amber-800">Password must contain:</p>
+                        <p className="text-xs text-amber-700 mt-0.5">
+                          8+ chars, uppercase, lowercase, number & special character
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
                   <label className="block text-sm font-medium text-gray-700 mb-2">Password *</label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -1035,6 +1032,16 @@ export default function RegisterPage() {
                       type={showPassword ? "text" : "password"}
                       value={formData.password}
                       onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                      onBlur={() => {
+                        // On mobile, if password is entered but weak, show the modal once
+                        if (formData.password && window.innerWidth < 768) {
+                          const validation = AuthUtils.validatePasswordStrength(formData.password)
+                          if (!validation.isValid && !passwordWarningShown) {
+                            setShowPasswordWarning(true)
+                            setPasswordWarningShown(true)
+                          }
+                        }
+                      }}
                       required
                       className="w-full pl-12 pr-12 py-3 text-base bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                       placeholder="Create a strong password"
@@ -1161,7 +1168,7 @@ export default function RegisterPage() {
           </div>
         </div>
 
-        {/* Desktop Content - Same as before */}
+        {/* Desktop Content */}
         <div className="hidden lg:flex flex-col h-full">
           <div className="shrink-0">
             <div className="flex items-center space-x-4 mb-8">
@@ -1406,6 +1413,77 @@ export default function RegisterPage() {
           </div>
         </div>
       </div>
+
+      {/* Password Requirements Warning Modal */}
+      {showPasswordWarning && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowPasswordWarning(false)}
+          />
+          
+          {/* Modal Content */}
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            {/* Header */}
+            <div className="bg-linear-to-r from-amber-500 to-orange-500 px-6 py-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                  <AlertCircle className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">Password Too Weak</h3>
+                  <p className="text-amber-100 text-xs">Please meet all requirements</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="px-6 py-5">
+              <p className="text-gray-600 text-sm mb-4">
+                Your password is missing some requirements. Please make sure it includes:
+              </p>
+              
+              <div className="space-y-2.5">
+                {getPasswordRequirements(formData.password).map((req, index) => (
+                  <div 
+                    key={index}
+                    className={`flex items-center gap-3 p-2.5 rounded-lg ${
+                      req.met ? 'bg-green-50' : 'bg-red-50'
+                    }`}
+                  >
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
+                      req.met ? 'bg-green-100' : 'bg-red-100'
+                    }`}>
+                      {req.met ? (
+                        <CheckCircle className="w-4 h-4 text-green-600" />
+                      ) : (
+                        <X className="w-4 h-4 text-red-500" />
+                      )}
+                    </div>
+                    <span className={`text-sm font-medium ${
+                      req.met ? 'text-green-700' : 'text-red-700'
+                    }`}>
+                      {req.label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setShowPasswordWarning(false)}
+                className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-lg transition-colors text-base"
+              >
+                Got it, let me fix it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
