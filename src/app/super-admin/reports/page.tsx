@@ -258,12 +258,13 @@ export default function SuperAdminReportsPage() {
       })
       setTeacherPerformance(teacherPerf.sort((a, b) => b.attendance_rate - a.attendance_rate))
 
-      // Fetch at-risk students
+      // Fetch at-risk students — ✅ ADDED `date` TO SELECT
       const { data: studentAttendance } = await supabase
         .from('attendance')
         .select(`
           student_id,
           status,
+          date,
           students:student_id (
             full_name,
             lrn,
