@@ -39,8 +39,6 @@ import {
   Area
 } from 'recharts'
 import * as XLSX from 'xlsx'
-import jsPDF from 'jspdf'
-import autoTable from 'jspdf-autotable'
 
 interface ReportData {
   totalStudents: number
@@ -97,6 +95,7 @@ interface TeacherAttendanceRow {
 
 interface StudentAttendanceRow {
   student_id: string | null
+  date: string
   status: 'present' | 'late' | 'absent'
   students:
     | {
@@ -104,14 +103,52 @@ interface StudentAttendanceRow {
         lrn: string
         grade: string
         section: string
+        sex?: string | null
       }
     | Array<{
         full_name: string
         lrn: string
         grade: string
         section: string
+        sex?: string | null
       }>
     | null
+}
+
+// SF2 types
+type Sf2DateColumn = {
+  date: string
+  dayNumber: string
+  weekday: string
+}
+
+type Sf2LearnerRow = {
+  student_id: string
+  student_name: string
+  lrn: string
+  sex: string
+  grade: string
+  section: string
+  attendanceByDate: Record<string, string>
+  presentCount: number
+  lateCount: number
+  absentCount: number
+  teacherNames: string[]
+}
+
+type Sf2SectionGroup = {
+  grade: string
+  section: string
+  adviser: string
+  dates: Sf2DateColumn[]
+  learners: Sf2LearnerRow[]
+  maleLearners: Sf2LearnerRow[]
+  femaleLearners: Sf2LearnerRow[]
+  unknownLearners: Sf2LearnerRow[]
+  presentCount: number
+  lateCount: number
+  absentCount: number
+  totalCount: number
 }
 
 export default function SuperAdminReportsPage() {
@@ -300,104 +337,493 @@ export default function SuperAdminReportsPage() {
     return Math.ceil(diffDays * (5/7))
   }
 
+  // ============================================================
+  // SF2 HELPERS
+  // ============================================================
+
+  const attendanceCodeMap: Record<string, string> = {
+    present: 'P',
+    late: 'L',
+    absent: 'A'
+  }
+
+  const getStatusCode = (status: string) =>
+    attendanceCodeMap[status] ?? status?.charAt(0)?.toUpperCase() ?? ''
+
+  const normalizeSex = (sex?: string | null) => {
+    const normalized = (sex || '').trim().toLowerCase()
+    if (normalized === 'male' || normalized === 'm') return 'Male'
+    if (normalized === 'female' || normalized === 'f') return 'Female'
+    return ''
+  }
+
+  const getDateColumns = (startDate: string, endDate: string): Sf2DateColumn[] => {
+    const dates: Sf2DateColumn[] = []
+    const current = new Date(`${startDate}T00:00:00`)
+    const end = new Date(`${endDate}T00:00:00`)
+    const weekLabels = ['SU', 'M', 'T', 'W', 'TH', 'F', 'SA']
+
+    const formatKey = (d: Date) => {
+      const y = d.getFullYear()
+      const m = `${d.getMonth() + 1}`.padStart(2, '0')
+      const day = `${d.getDate()}`.padStart(2, '0')
+      return `${y}-${m}-${day}`
+    }
+
+    while (current <= end) {
+      dates.push({
+        date: formatKey(current),
+        dayNumber: current.getDate().toString(),
+        weekday: weekLabels[current.getDay()]
+      })
+      current.setDate(current.getDate() + 1)
+    }
+    return dates
+  }
+
+  const formatReportMonthLabel = (startDate: string, endDate: string) => {
+    const start = new Date(`${startDate}T00:00:00`)
+    const end = new Date(`${endDate}T00:00:00`)
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      return `${startDate} to ${endDate}`
+    }
+    const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear()
+    if (sameMonth) {
+      return start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    }
+    return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} to ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+  }
+
+  const getSchoolYearLabel = (startDate: string) => {
+    const start = new Date(`${startDate}T00:00:00`)
+    if (Number.isNaN(start.getTime())) return ''
+    const year = start.getMonth() >= 5 ? start.getFullYear() : start.getFullYear() - 1
+    return `${year}-${year + 1}`
+  }
+
+  const buildSf2Sections = (data: StudentAttendanceRow[]): Sf2SectionGroup[] => {
+    const dates = getDateColumns(dateRange.start, dateRange.end)
+    const sectionMap = new Map<string, Map<string, {
+      student: Sf2LearnerRow
+      latestByDate: Map<string, { status: string }>
+    }>>()
+    const teacherMap = new Map<string, Set<string>>()
+
+    const getSectionKey = (record: StudentAttendanceRow) => {
+      const student = Array.isArray(record.students) ? record.students[0] : record.students
+      const grade = student?.grade || 'N/A'
+      const section = (student?.section || 'UNASSIGNED').trim() || 'UNASSIGNED'
+      return `${grade}||${section}`
+    }
+
+    data.forEach(record => {
+      const student = Array.isArray(record.students) ? record.students[0] : record.students
+      if (!record.student_id || !student) return
+
+      const sectionKey = getSectionKey(record)
+      if (!sectionMap.has(sectionKey)) sectionMap.set(sectionKey, new Map())
+      if (!teacherMap.has(sectionKey)) teacherMap.set(sectionKey, new Set())
+
+      const learners = sectionMap.get(sectionKey)!
+      const sex = normalizeSex(student.sex)
+      const existing = learners.get(record.student_id)
+      const latestByDate = existing?.latestByDate || new Map<string, { status: string }>()
+
+      if (!existing) {
+        learners.set(record.student_id, {
+          student: {
+            student_id: record.student_id,
+            student_name: student.full_name.toUpperCase(),
+            lrn: student.lrn || '',
+            sex,
+            grade: student.grade || 'N/A',
+            section: student.section || 'UNASSIGNED',
+            attendanceByDate: {},
+            presentCount: 0,
+            lateCount: 0,
+            absentCount: 0,
+            teacherNames: []
+          },
+          latestByDate
+        })
+      }
+
+      const learnerEntry = learners.get(record.student_id)!
+      // First record per day wins (Super Admin query doesn't include time_in)
+      if (!learnerEntry.latestByDate.has(record.date)) {
+        learnerEntry.latestByDate.set(record.date, { status: record.status })
+      }
+    })
+
+    return Array.from(sectionMap.entries()).map(([sectionKey, learners]) => {
+      const [grade, section] = sectionKey.split('||')
+      const adviserNames = Array.from(teacherMap.get(sectionKey) || []).filter(Boolean)
+      const adviser = adviserNames.length === 1 ? adviserNames[0]
+        : adviserNames.length > 1 ? 'Multiple Advisers'
+        : 'Unassigned'
+
+      const learnerRows = Array.from(learners.values()).map(({ student, latestByDate }) => {
+        const attendanceByDate: Record<string, string> = {}
+        let presentCount = 0, lateCount = 0, absentCount = 0
+
+        dates.forEach(dateColumn => {
+          const entry = latestByDate.get(dateColumn.date)
+          if (entry && entry.status) {
+            const code = getStatusCode(entry.status)
+            attendanceByDate[dateColumn.date] = code
+            if (entry.status === 'present') presentCount += 1
+            else if (entry.status === 'late') lateCount += 1
+            else if (entry.status === 'absent') absentCount += 1
+          }
+        })
+
+        return { ...student, attendanceByDate, presentCount, lateCount, absentCount }
+      })
+
+      learnerRows.sort((a, b) => a.student_name.localeCompare(b.student_name))
+
+      const maleLearners = learnerRows.filter(l => l.sex === 'Male')
+      const femaleLearners = learnerRows.filter(l => l.sex === 'Female')
+      const unknownLearners = learnerRows.filter(l => !l.sex)
+
+      const presentCount = learnerRows.reduce((s, l) => s + l.presentCount, 0)
+      const lateCount = learnerRows.reduce((s, l) => s + l.lateCount, 0)
+      const absentCount = learnerRows.reduce((s, l) => s + l.absentCount, 0)
+
+      return {
+        grade, section, adviser, dates,
+        learners: learnerRows,
+        maleLearners, femaleLearners, unknownLearners,
+        presentCount, lateCount, absentCount,
+        totalCount: learnerRows.length
+      }
+    }).sort((a, b) => {
+      const gc = a.grade.localeCompare(b.grade, undefined, { numeric: true, sensitivity: 'base' })
+      if (gc !== 0) return gc
+      return a.section.localeCompare(b.section)
+    })
+  }
+
+  // ============================================================
+  // PDF EXPORT — SF2 format matching Admin page
+  // ============================================================
   const handleExportPDF = async () => {
     try {
       setExporting(true)
-      const doc = new jsPDF()
-      
-      // Header
-      doc.setFillColor(59, 130, 246)
-      doc.rect(0, 0, 210, 40, 'F')
-      doc.setTextColor(255, 255, 255)
-      doc.setFontSize(24)
-      doc.setFont('helvetica', 'bold')
-      doc.text('EduScan - School Attendance Report', 105, 25, { align: 'center' })
-      
-      doc.setFontSize(10)
-      doc.text(`Period: ${dateRange.start} to ${dateRange.end}`, 105, 35, { align: 'center' })
-      doc.text(`Generated: ${new Date().toLocaleString()}`, 105, 40, { align: 'center' })
-      
-      // Summary
-      let yPos = 55
-      doc.setTextColor(33, 37, 41)
-      doc.setFontSize(14)
-      doc.setFont('helvetica', 'bold')
-      doc.text('Executive Summary', 20, yPos)
-      
-      doc.setFontSize(10)
-      doc.setFont('helvetica', 'normal')
-      doc.setTextColor(73, 80, 87)
-      yPos += 10
-      
-      const summaryData = [
-        ['Total Students:', reportData?.totalStudents.toString() || '0'],
-        ['Total Teachers:', reportData?.totalTeachers.toString() || '0'],
-        ['Total Attendance Records:', reportData?.totalAttendance.toString() || '0'],
-        ['Present:', reportData?.presentCount.toString() || '0'],
-        ['Late:', reportData?.lateCount.toString() || '0'],
-        ['Absent:', reportData?.absentCount.toString() || '0'],
-        ['Overall Attendance Rate:', `${reportData?.attendanceRate || 0}%`]
-      ]
-      
-      summaryData.forEach((item, index) => {
-        doc.text(item[0], 20, yPos + (index * 7))
-        doc.text(item[1], 80, yPos + (index * 7))
-      })
-      
-      // Teacher Performance
-      yPos = 110
-      doc.setFontSize(14)
-      doc.setFont('helvetica', 'bold')
-      doc.text('Teacher Performance', 20, yPos)
-      
-      yPos += 10
-      const teacherTableData = teacherPerformance.slice(0, 10).map(t => [
-        t.teacher_name,
-        t.total_sessions.toString(),
-        t.present.toString(),
-        t.late.toString(),
-        t.absent.toString(),
-        `${t.attendance_rate}%`
-      ])
-      
-      autoTable(doc, {
-        startY: yPos,
-        head: [['Teacher', 'Sessions', 'Present', 'Late', 'Absent', 'Rate']],
-        body: teacherTableData,
-        theme: 'striped',
-        headStyles: { fillColor: [59, 130, 246], textColor: [255, 255, 255] },
-        margin: { left: 20, right: 20 }
-      })
-      
-      // At-Risk Students
-      yPos = ((doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || yPos) + 15
-      doc.setFontSize(14)
-      doc.setFont('helvetica', 'bold')
-      doc.text('At-Risk Students', 20, yPos)
-      
-      yPos += 10
-      const riskTableData = atRiskStudents.slice(0, 15).map(s => [
-        s.student_name,
-        s.lrn,
-        `G${s.grade}-${s.section}`,
-        s.absent_count.toString(),
-        s.late_count.toString(),
-        `${s.attendance_rate}%`,
-        s.risk_level.toUpperCase()
-      ])
-      
-      autoTable(doc, {
-        startY: yPos,
-        head: [['Student', 'LRN', 'Class', 'Absent', 'Late', 'Rate', 'Risk']],
-        body: riskTableData,
-        theme: 'striped',
-        headStyles: { fillColor: [239, 68, 68], textColor: [255, 255, 255] },
-        margin: { left: 20, right: 20 }
-      })
-      
-      doc.save(`school_report_${dateRange.start}_to_${dateRange.end}.pdf`)
+
+      // Fetch raw student attendance rows (needed for SF2 matrix)
+      const { data: studentAttendance, error } = await supabase
+        .from('attendance')
+        .select(`
+          student_id,
+          status,
+          date,
+          students:student_id (
+            full_name,
+            lrn,
+            grade,
+            section,
+            sex
+          )
+        `)
+        .gte('date', dateRange.start)
+        .lte('date', dateRange.end)
+
+      if (error) throw error
+      if (!studentAttendance || studentAttendance.length === 0) {
+        alert('No attendance data available for the selected period.')
+        return
+      }
+
+      // Apply grade/section filters
+      let filtered = studentAttendance as StudentAttendanceRow[]
+      if (selectedGrade !== 'all') {
+        filtered = filtered.filter(r => {
+          const s = Array.isArray(r.students) ? r.students[0] : r.students
+          return s?.grade === selectedGrade
+        })
+      }
+      if (selectedSection !== 'all') {
+        filtered = filtered.filter(r => {
+          const s = Array.isArray(r.students) ? r.students[0] : r.students
+          return s?.section === selectedSection
+        })
+      }
+
+      const sf2Sections = buildSf2Sections(filtered)
+      if (!sf2Sections.length) {
+        alert('No attendance data available for the selected filters.')
+        return
+      }
+
+      // Dynamic imports to avoid SSR bundling issues
+      const jspdfModule = await import('jspdf')
+      const { jsPDF } = jspdfModule as any
+      const autoTableModule = await import('jspdf-autotable')
+      const autoTable = (autoTableModule && (autoTableModule as any).default) || autoTableModule
+
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'legal' })
+      const reportMonthLabel = formatReportMonthLabel(dateRange.start, dateRange.end)
+      const pageWidth = doc.internal.pageSize.getWidth()
+      const pageHeight = doc.internal.pageSize.getHeight()
+      const marginX = 6
+      const tableTop = 40
+      const footerReserve = 50
+      const footerTop = pageHeight - footerReserve - 6
+
+      // Try to load school logo (optional, won't fail export)
+      let schoolLogo: string | null = null
+      try {
+        const response = await fetch('/logo.png')
+        if (response.ok) {
+          const blob = await response.blob()
+          schoolLogo = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onloadend = () => resolve(reader.result as string)
+            reader.onerror = () => reject(new Error('Unable to read logo'))
+            reader.readAsDataURL(blob)
+          })
+        }
+      } catch {
+        schoolLogo = null
+      }
+
+      for (let i = 0; i < sf2Sections.length; i++) {
+        const group = sf2Sections[i]
+        if (i > 0) doc.addPage()
+
+        const weekdaySet = new Set(['M', 'T', 'W', 'TH', 'F'])
+        const dateHeaders: any[] = []
+
+        // Pad weekday columns so Mon..Fri always appear
+        const firstDateStr = group.dates?.[0]?.date
+        if (firstDateStr) {
+          const firstDate = new Date(`${firstDateStr}T00:00:00`)
+          const firstDay = firstDate.getDay()
+          const weekLabels = ['SU', 'M', 'T', 'W', 'TH', 'F', 'SA']
+          for (let w = 1; w < firstDay; w++) {
+            if (w >= 1 && w <= 5) {
+              dateHeaders.push({
+                date: `__placeholder_${firstDateStr}_${w}`,
+                dayNumber: '',
+                weekday: weekLabels[w],
+                label: weekLabels[w]
+              })
+            }
+          }
+        }
+
+        group.dates.forEach(dc => {
+          if (weekdaySet.has(dc.weekday)) {
+            dateHeaders.push({ ...dc, label: dc.weekday })
+          }
+        })
+
+        const buildTableBody = (learners: Sf2LearnerRow[], startIdx: number) => {
+          const body: any[] = []
+          learners.forEach((learner, idx) => {
+            body.push([
+              (startIdx + idx + 1).toString(),
+              learner.student_name,
+              ...dateHeaders.map(dc => {
+                const code = learner.attendanceByDate[dc.date] || ''
+                return code === 'P' ? 'P' : code === 'A' ? 'A' : code === 'L' ? 'L' : ''
+              }),
+              learner.absentCount.toString(),
+              (learner.presentCount + learner.lateCount).toString(),
+              learner.lrn ? `LRN ${learner.lrn}` : ''
+            ])
+          })
+          return body
+        }
+
+        const calculateDailyTotals = (learners: Sf2LearnerRow[]) =>
+          dateHeaders.map(dc =>
+            learners.reduce((count, l) =>
+              count + (l.attendanceByDate[dc.date] === 'P' ? 1 : 0), 0
+            ).toString()
+          )
+
+        const completeBody: any[] = []
+        let learnerStartIndex = 0
+
+        const appendLearnerGroup = (label: string, learners: Sf2LearnerRow[]) => {
+          if (!learners.length) return
+          completeBody.push([
+            { content: `${label} LEARNERS`, colSpan: 5 + dateHeaders.length, styles: { halign: 'left', fontStyle: 'bold', fillColor: [226, 232, 240] } }
+          ])
+          buildTableBody(learners, learnerStartIndex).forEach(row => completeBody.push(row))
+          learnerStartIndex += learners.length
+          const subtotalRow: any[] = [
+            '',
+            `${label} TOTAL PER DAY`,
+            ...calculateDailyTotals(learners),
+            learners.reduce((t, l) => t + l.absentCount, 0).toString(),
+            learners.reduce((t, l) => t + l.presentCount + l.lateCount, 0).toString(),
+            ''
+          ]
+          completeBody.push(subtotalRow)
+          completeBody.push([{ content: '', colSpan: 5 + dateHeaders.length, styles: { fillColor: [248, 250, 252] } }])
+        }
+
+        appendLearnerGroup('MALE', group.maleLearners)
+        appendLearnerGroup('FEMALE', group.femaleLearners)
+        appendLearnerGroup('UNSPECIFIED', group.unknownLearners)
+
+        completeBody.push([
+          '',
+          'COMBINED TOTAL PER DAY',
+          ...calculateDailyTotals(group.learners),
+          group.absentCount.toString(),
+          (group.presentCount + group.lateCount).toString(),
+          ''
+        ])
+
+        const rowCount = completeBody.length
+        const compactMode = rowCount > 38
+        const tableFontSize = compactMode ? 4.5 : rowCount > 30 ? 4.8 : 5.2
+        const tablePadding = compactMode ? 0.45 : rowCount > 30 ? 0.55 : 0.75
+        const learnerWidth = compactMode ? 42 : 46
+        const remarksWidth = compactMode ? 18 : 22
+        const dateCellWidth = Math.max(5.2, Math.min(6.6,
+          (pageWidth - (marginX * 2) - 6 - learnerWidth - 10 - 10 - remarksWidth) / Math.max(dateHeaders.length, 1)
+        ))
+
+        // === HEADER ===
+        if (schoolLogo) {
+          try { doc.addImage(schoolLogo, 'PNG', marginX, 5, 14, 14) } catch {}
+        }
+
+        doc.setTextColor(0, 0, 0)
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(13)
+        doc.text(process.env.NEXT_PUBLIC_SCHOOL_NAME || 'Saint Anne Academy', pageWidth / 2, 9, { align: 'center' })
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(9)
+        doc.text('School Form 2 (SF2) Daily Attendance Report of Learners', pageWidth / 2, 14, { align: 'center' })
+        doc.setFontSize(7.5)
+        doc.text('Official SF2-style attendance layout generated from the selected filters', pageWidth / 2, 18, { align: 'center' })
+
+        doc.setDrawColor(0, 0, 0)
+        doc.setLineWidth(0.15)
+        doc.rect(marginX, 22.5, pageWidth - marginX * 2, 13)
+        doc.line(pageWidth / 2, 22.5, pageWidth / 2, 35.5)
+        doc.line(marginX, 29, pageWidth - marginX, 29)
+
+        doc.setFontSize(7.5)
+        doc.setFont('helvetica', 'bold')
+        doc.text('School Name:', marginX + 2, 26)
+        doc.text('School Year:', pageWidth / 2 + 2, 26)
+        doc.text('Grade Level:', marginX + 2, 32.5)
+        doc.text('Section / Adviser:', pageWidth / 2 + 2, 32.5)
+
+        doc.setFont('helvetica', 'normal')
+        doc.text(process.env.NEXT_PUBLIC_SCHOOL_NAME || 'Saint Anne Academy', marginX + 32, 26)
+        doc.text(getSchoolYearLabel(dateRange.start) || '________________', pageWidth / 2 + 32, 26)
+        doc.text(`Grade ${group.grade}`, marginX + 32, 32.5)
+        doc.text(`${group.section} / ${group.adviser}`, pageWidth / 2 + 42, 32.5, {
+          maxWidth: (pageWidth / 2) - 45
+        })
+
+        // === TABLE ===
+        const tableOptions: any = {
+          startY: tableTop,
+          head: [[
+            'No.',
+            "Learner's Name",
+            ...dateHeaders.map((dc: any) => dc.label),
+            'ABSENT',
+            'PRESENT',
+            'REMARKS'
+          ]],
+          body: completeBody,
+          theme: 'grid',
+          pageBreak: 'avoid',
+          rowPageBreak: 'avoid',
+          tableWidth: 'auto',
+          styles: {
+            fontSize: tableFontSize,
+            cellPadding: tablePadding,
+            valign: 'middle',
+            lineColor: [0, 0, 0],
+            lineWidth: 0.1
+          },
+          headStyles: {
+            fillColor: [226, 232, 240],
+            textColor: [0, 0, 0],
+            fontStyle: 'bold',
+            halign: 'center',
+            valign: 'middle'
+          },
+          columnStyles: {
+            0: { cellWidth: 8, halign: 'center' },
+            1: { cellWidth: learnerWidth, halign: 'left' },
+            ...Object.fromEntries(dateHeaders.map((_: any, idx: number) => [idx + 2, { cellWidth: dateCellWidth, halign: 'center' }])),
+            [dateHeaders.length + 2]: { cellWidth: 10, halign: 'center' },
+            [dateHeaders.length + 3]: { cellWidth: 10, halign: 'center' },
+            [dateHeaders.length + 4]: { cellWidth: remarksWidth, halign: 'left' }
+          },
+          margin: { left: marginX, right: marginX, top: tableTop, bottom: footerReserve },
+          didParseCell: (data: any) => {
+            const rawRow = data.row.raw as any
+            if (Array.isArray(rawRow) && rawRow[0]?.content?.includes('LEARNERS')) {
+              data.cell.styles.fontStyle = 'bold'
+              data.cell.styles.fillColor = [59, 130, 246]
+              data.cell.styles.textColor = [255, 255, 255]
+            }
+            if (Array.isArray(rawRow) && rawRow[1]?.content?.includes('TOTAL PER DAY')) {
+              data.cell.styles.fontStyle = 'bold'
+              data.cell.styles.fillColor = [241, 245, 249]
+            }
+          }
+        }
+
+        autoTable(doc, tableOptions)
+
+        // === FOOTER ===
+        doc.setDrawColor(0, 0, 0)
+        doc.setLineWidth(0.15)
+        doc.rect(marginX, footerTop, pageWidth - marginX * 2, 40)
+
+        doc.setFontSize(8)
+        doc.setFont('helvetica', 'bold')
+        doc.text('ATTENDANCE CODES / SUMMARY', marginX + 2, footerTop + 6)
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(7)
+        doc.text(
+          `Learners: ${group.totalCount}  |  Present / On Time: ${group.presentCount}  |  Late: ${group.lateCount}  |  Absent: ${group.absentCount}`,
+          marginX + 2, footerTop + 12
+        )
+        doc.text(`Report Month: ${reportMonthLabel}`, marginX + 2, footerTop + 17)
+
+        doc.setFont('helvetica', 'bold')
+        doc.text('P - Present', pageWidth / 2 - 30, footerTop + 12)
+        doc.setFont('helvetica', 'normal')
+        doc.text('L - Late', pageWidth / 2 - 30, footerTop + 17)
+        doc.text('A - Absent', pageWidth / 2 - 30, footerTop + 22)
+
+        doc.setFont('helvetica', 'bold')
+        doc.text('Guidelines:', marginX + 2, footerTop + 22)
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(6.8)
+        doc.text('1. Mark only one code per learner per date.', marginX + 2, footerTop + 27, { maxWidth: (pageWidth / 2) - 12 })
+        doc.text('2. Use the final daily status for the day.', marginX + 2, footerTop + 32, { maxWidth: (pageWidth / 2) - 12 })
+
+        doc.setFont('helvetica', 'bold')
+        doc.text('Certified true and correct by the adviser:', pageWidth - marginX - 2, footerTop + 6, { align: 'right' })
+        doc.setFont('helvetica', 'normal')
+        doc.line(pageWidth - 90, footerTop + 18, pageWidth - 10, footerTop + 18)
+        doc.text('Signature over Printed Name', pageWidth - 50, footerTop + 22, { align: 'center' })
+
+        doc.setFontSize(6)
+        doc.setTextColor(100, 100, 100)
+        doc.text('Generated by EduScan — Super Admin Reports', pageWidth / 2, pageHeight - 4, { align: 'center' })
+      }
+
+      doc.save(`SF2_SCHOOL_REPORT_${dateRange.start}_to_${dateRange.end}.pdf`)
     } catch (error) {
-      console.error('Error exporting PDF:', error)
+      console.error('Error exporting SF2 PDF:', error)
+      alert('Failed to generate SF2 PDF. Please try again.')
     } finally {
       setExporting(false)
     }
