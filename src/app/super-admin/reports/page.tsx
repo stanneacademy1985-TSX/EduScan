@@ -93,13 +93,17 @@ interface TeacherAttendanceRow {
   status: 'present' | 'late' | 'absent'
 }
 
+// ✅ Added time_in and separated first/last names to match Admin page logic
 interface StudentAttendanceRow {
   student_id: string | null
   date: string
+  time_in: string
   status: 'present' | 'late' | 'absent'
   students:
     | {
         full_name: string
+        first_name?: string
+        last_name?: string
         lrn: string
         grade: string
         section: string
@@ -107,6 +111,8 @@ interface StudentAttendanceRow {
       }
     | Array<{
         full_name: string
+        first_name?: string
+        last_name?: string
         lrn: string
         grade: string
         section: string
@@ -257,13 +263,14 @@ export default function SuperAdminReportsPage() {
       })
       setTeacherPerformance(teacherPerf.sort((a, b) => b.attendance_rate - a.attendance_rate))
 
-      // Fetch at-risk students (with date to satisfy StudentAttendanceRow type)
+      // Fetch at-risk students — ✅ ADDED time_in to match Admin logic
       const { data: studentAttendance } = await supabase
         .from('attendance')
         .select(`
           student_id,
           status,
           date,
+          time_in,
           students:student_id (
             full_name,
             lrn,
@@ -333,6 +340,7 @@ export default function SuperAdminReportsPage() {
     const end = new Date(dateRange.end)
     const diffTime = Math.abs(end.getTime() - start.getTime())
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1
+    // Assuming 5 school days per week
     return Math.ceil(diffDays * (5/7))
   }
 
@@ -400,12 +408,34 @@ export default function SuperAdminReportsPage() {
     return `${year}-${year + 1}`
   }
 
-  // ✅ ADVISER REMOVED — only groups by grade + section
+  // ✅ Added helper to parse time_in for duplicate resolution
+  const parseTimeInHeconds = (time: string) => {
+    const parts = time.split(':').map(Number)
+    if (parts.length !== 3) return 0
+    return parts[0] * 3600 + parts[1] * 60 + parts[2]
+  }
+
+  // ✅ Added formatLearnerName to match Admin logic (LASTNAME, Firstname)
+  const formatLearnerName = (record: StudentAttendanceRow) => {
+    const student = Array.isArray(record.students) ? record.students[0] : record.students
+    if (!student) return 'UNKNOWN'
+    
+    const firstName = student.first_name?.trim() || ''
+    const lastName = student.last_name?.trim() || ''
+    const fullName = student.full_name?.trim() || ''
+
+    if (firstName || lastName) {
+      return [lastName, firstName].filter(Boolean).join(', ').toUpperCase()
+    }
+
+    return fullName.toUpperCase()
+  }
+
   const buildSf2Sections = (data: StudentAttendanceRow[]): Sf2SectionGroup[] => {
     const dates = getDateColumns(dateRange.start, dateRange.end)
     const sectionMap = new Map<string, Map<string, {
       student: Sf2LearnerRow
-      latestByDate: Map<string, { status: string }>
+      latestByDate: Map<string, { status: string; timeSeconds: number }>
     }>>()
 
     const getSectionKey = (record: StudentAttendanceRow) => {
@@ -425,13 +455,13 @@ export default function SuperAdminReportsPage() {
       const learners = sectionMap.get(sectionKey)!
       const sex = normalizeSex(student.sex)
       const existing = learners.get(record.student_id)
-      const latestByDate = existing?.latestByDate || new Map<string, { status: string }>()
+      const latestByDate = existing?.latestByDate || new Map<string, { status: string; timeSeconds: number }>()
 
       if (!existing) {
         learners.set(record.student_id, {
           student: {
             student_id: record.student_id,
-            student_name: student.full_name.toUpperCase(),
+            student_name: formatLearnerName(record), // ✅ Uses Admin name format
             lrn: student.lrn || '',
             sex,
             grade: student.grade || 'N/A',
@@ -447,8 +477,16 @@ export default function SuperAdminReportsPage() {
       }
 
       const learnerEntry = learners.get(record.student_id)!
-      if (!learnerEntry.latestByDate.has(record.date)) {
-        learnerEntry.latestByDate.set(record.date, { status: record.status })
+      
+      // ✅ Uses Admin duplicate resolution logic (latest time_in wins)
+      const timeSeconds = parseTimeInHeconds(record.time_in || '00:00:00')
+      const currentEntry = learnerEntry.latestByDate.get(record.date)
+
+      if (!currentEntry || timeSeconds >= currentEntry.timeSeconds) {
+        learnerEntry.latestByDate.set(record.date, {
+          status: record.status,
+          timeSeconds
+        })
       }
     })
 
@@ -504,14 +542,18 @@ export default function SuperAdminReportsPage() {
     try {
       setExporting(true)
 
+      // ✅ Added time_in and first/last names to select
       const { data: studentAttendance, error } = await supabase
         .from('attendance')
         .select(`
           student_id,
           status,
           date,
+          time_in,
           students:student_id (
             full_name,
+            first_name,
+            last_name,
             lrn,
             grade,
             section,
@@ -527,6 +569,7 @@ export default function SuperAdminReportsPage() {
         return
       }
 
+      // Apply grade/section filters
       let filtered = studentAttendance as StudentAttendanceRow[]
       if (selectedGrade !== 'all') {
         filtered = filtered.filter(r => {
@@ -547,6 +590,7 @@ export default function SuperAdminReportsPage() {
         return
       }
 
+      // Dynamic imports to avoid SSR bundling issues
       const jspdfModule = await import('jspdf')
       const { jsPDF } = jspdfModule as any
       const autoTableModule = await import('jspdf-autotable')
@@ -561,6 +605,7 @@ export default function SuperAdminReportsPage() {
       const footerReserve = 50
       const footerTop = pageHeight - footerReserve - 6
 
+      // Try to load school logo (optional, won't fail export)
       let schoolLogo: string | null = null
       try {
         const response = await fetch('/logo.png')
@@ -584,6 +629,7 @@ export default function SuperAdminReportsPage() {
         const weekdaySet = new Set(['M', 'T', 'W', 'TH', 'F'])
         const dateHeaders: any[] = []
 
+        // Pad weekday columns so Mon..Fri always appear
         const firstDateStr = group.dates?.[0]?.date
         if (firstDateStr) {
           const firstDate = new Date(`${firstDateStr}T00:00:00`)
@@ -709,7 +755,7 @@ export default function SuperAdminReportsPage() {
         doc.text(process.env.NEXT_PUBLIC_SCHOOL_NAME || 'Saint Anne Academy', marginX + 32, 26)
         doc.text(getSchoolYearLabel(dateRange.start) || '________________', pageWidth / 2 + 32, 26)
         doc.text(`Grade ${group.grade}`, marginX + 32, 32.5)
-        doc.text(`${group.section}`, pageWidth / 2 + 42, 32.5, { // ✅ Was `${group.section} / ${group.adviser}`
+        doc.text(group.section, pageWidth / 2 + 42, 32.5, { // ✅ Was `${group.section} / ${group.adviser}`
           maxWidth: (pageWidth / 2) - 45
         })
 
@@ -798,7 +844,7 @@ export default function SuperAdminReportsPage() {
         doc.text('2. Use the final daily status for the day.', marginX + 2, footerTop + 32, { maxWidth: (pageWidth / 2) - 12 })
 
         doc.setFont('helvetica', 'bold')
-        doc.text('Certified true and correct:', pageWidth - marginX - 2, footerTop + 6, { align: 'right' })
+        doc.text('Certified true and correct:', pageWidth - marginX - 2, footerTop + 6, { align: 'right' }) // ✅ removed "by the adviser"
         doc.setFont('helvetica', 'normal')
         doc.line(pageWidth - 90, footerTop + 18, pageWidth - 10, footerTop + 18)
         doc.text('Signature over Printed Name', pageWidth - 50, footerTop + 22, { align: 'center' })
@@ -822,6 +868,7 @@ export default function SuperAdminReportsPage() {
       setExporting(true)
       const workbook = XLSX.utils.book_new()
       
+      // Summary Sheet
       const summarySheet = XLSX.utils.json_to_sheet([{
         'Report Period': `${dateRange.start} to ${dateRange.end}`,
         'Generated On': new Date().toLocaleString(),
@@ -835,6 +882,7 @@ export default function SuperAdminReportsPage() {
       }])
       XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary')
       
+      // Teacher Performance Sheet
       const teacherSheet = XLSX.utils.json_to_sheet(teacherPerformance.map(t => ({
         'Teacher': t.teacher_name,
         'Total Sessions': t.total_sessions,
@@ -845,6 +893,7 @@ export default function SuperAdminReportsPage() {
       })))
       XLSX.utils.book_append_sheet(workbook, teacherSheet, 'Teacher Performance')
       
+      // At-Risk Students Sheet
       const riskSheet = XLSX.utils.json_to_sheet(atRiskStudents.map(s => ({
         'Student Name': s.student_name,
         'LRN': s.lrn,
@@ -857,6 +906,7 @@ export default function SuperAdminReportsPage() {
       })))
       XLSX.utils.book_append_sheet(workbook, riskSheet, 'At-Risk Students')
       
+      // Daily Trend Sheet
       const trendSheet = XLSX.utils.json_to_sheet(dailyTrend.map(d => ({
         'Date': d.date,
         'Present': d.present,
@@ -1118,6 +1168,7 @@ export default function SuperAdminReportsPage() {
         </div>
       </div>
 
+      {/* Grade Breakdown */}
       {gradeChartData.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center gap-3 mb-4">
@@ -1138,6 +1189,7 @@ export default function SuperAdminReportsPage() {
         </div>
       )}
 
+      {/* Teacher Performance Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="p-5 border-b border-gray-200">
           <div className="flex items-center gap-3">
@@ -1197,6 +1249,7 @@ export default function SuperAdminReportsPage() {
         </div>
       </div>
 
+      {/* At-Risk Students */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="p-5 border-b border-gray-200">
           <div className="flex items-center gap-3">
@@ -1257,6 +1310,7 @@ export default function SuperAdminReportsPage() {
               </table>
             </div>
 
+            {/* Pagination */}
             {totalPages > 1 && (
               <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
                 <p className="text-sm text-gray-600">
