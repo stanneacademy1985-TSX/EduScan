@@ -139,7 +139,6 @@ type Sf2LearnerRow = {
 type Sf2SectionGroup = {
   grade: string
   section: string
-  adviser: string
   dates: Sf2DateColumn[]
   learners: Sf2LearnerRow[]
   maleLearners: Sf2LearnerRow[]
@@ -258,7 +257,7 @@ export default function SuperAdminReportsPage() {
       })
       setTeacherPerformance(teacherPerf.sort((a, b) => b.attendance_rate - a.attendance_rate))
 
-      // Fetch at-risk students — ✅ ADDED `date` TO SELECT
+      // Fetch at-risk students (with date to satisfy StudentAttendanceRow type)
       const { data: studentAttendance } = await supabase
         .from('attendance')
         .select(`
@@ -334,7 +333,6 @@ export default function SuperAdminReportsPage() {
     const end = new Date(dateRange.end)
     const diffTime = Math.abs(end.getTime() - start.getTime())
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1
-    // Assuming 5 school days per week
     return Math.ceil(diffDays * (5/7))
   }
 
@@ -402,13 +400,13 @@ export default function SuperAdminReportsPage() {
     return `${year}-${year + 1}`
   }
 
+  // ✅ ADVISER REMOVED — only groups by grade + section
   const buildSf2Sections = (data: StudentAttendanceRow[]): Sf2SectionGroup[] => {
     const dates = getDateColumns(dateRange.start, dateRange.end)
     const sectionMap = new Map<string, Map<string, {
       student: Sf2LearnerRow
       latestByDate: Map<string, { status: string }>
     }>>()
-    const teacherMap = new Map<string, Set<string>>()
 
     const getSectionKey = (record: StudentAttendanceRow) => {
       const student = Array.isArray(record.students) ? record.students[0] : record.students
@@ -423,7 +421,6 @@ export default function SuperAdminReportsPage() {
 
       const sectionKey = getSectionKey(record)
       if (!sectionMap.has(sectionKey)) sectionMap.set(sectionKey, new Map())
-      if (!teacherMap.has(sectionKey)) teacherMap.set(sectionKey, new Set())
 
       const learners = sectionMap.get(sectionKey)!
       const sex = normalizeSex(student.sex)
@@ -450,7 +447,6 @@ export default function SuperAdminReportsPage() {
       }
 
       const learnerEntry = learners.get(record.student_id)!
-      // First record per day wins (Super Admin query doesn't include time_in)
       if (!learnerEntry.latestByDate.has(record.date)) {
         learnerEntry.latestByDate.set(record.date, { status: record.status })
       }
@@ -458,10 +454,6 @@ export default function SuperAdminReportsPage() {
 
     return Array.from(sectionMap.entries()).map(([sectionKey, learners]) => {
       const [grade, section] = sectionKey.split('||')
-      const adviserNames = Array.from(teacherMap.get(sectionKey) || []).filter(Boolean)
-      const adviser = adviserNames.length === 1 ? adviserNames[0]
-        : adviserNames.length > 1 ? 'Multiple Advisers'
-        : 'Unassigned'
 
       const learnerRows = Array.from(learners.values()).map(({ student, latestByDate }) => {
         const attendanceByDate: Record<string, string> = {}
@@ -492,7 +484,7 @@ export default function SuperAdminReportsPage() {
       const absentCount = learnerRows.reduce((s, l) => s + l.absentCount, 0)
 
       return {
-        grade, section, adviser, dates,
+        grade, section, dates,
         learners: learnerRows,
         maleLearners, femaleLearners, unknownLearners,
         presentCount, lateCount, absentCount,
@@ -506,13 +498,12 @@ export default function SuperAdminReportsPage() {
   }
 
   // ============================================================
-  // PDF EXPORT — SF2 format matching Admin page
+  // PDF EXPORT — SF2 format (section only, no adviser)
   // ============================================================
   const handleExportPDF = async () => {
     try {
       setExporting(true)
 
-      // Fetch raw student attendance rows (needed for SF2 matrix)
       const { data: studentAttendance, error } = await supabase
         .from('attendance')
         .select(`
@@ -536,7 +527,6 @@ export default function SuperAdminReportsPage() {
         return
       }
 
-      // Apply grade/section filters
       let filtered = studentAttendance as StudentAttendanceRow[]
       if (selectedGrade !== 'all') {
         filtered = filtered.filter(r => {
@@ -557,7 +547,6 @@ export default function SuperAdminReportsPage() {
         return
       }
 
-      // Dynamic imports to avoid SSR bundling issues
       const jspdfModule = await import('jspdf')
       const { jsPDF } = jspdfModule as any
       const autoTableModule = await import('jspdf-autotable')
@@ -572,7 +561,6 @@ export default function SuperAdminReportsPage() {
       const footerReserve = 50
       const footerTop = pageHeight - footerReserve - 6
 
-      // Try to load school logo (optional, won't fail export)
       let schoolLogo: string | null = null
       try {
         const response = await fetch('/logo.png')
@@ -596,7 +584,6 @@ export default function SuperAdminReportsPage() {
         const weekdaySet = new Set(['M', 'T', 'W', 'TH', 'F'])
         const dateHeaders: any[] = []
 
-        // Pad weekday columns so Mon..Fri always appear
         const firstDateStr = group.dates?.[0]?.date
         if (firstDateStr) {
           const firstDate = new Date(`${firstDateStr}T00:00:00`)
@@ -716,13 +703,13 @@ export default function SuperAdminReportsPage() {
         doc.text('School Name:', marginX + 2, 26)
         doc.text('School Year:', pageWidth / 2 + 2, 26)
         doc.text('Grade Level:', marginX + 2, 32.5)
-        doc.text('Section / Adviser:', pageWidth / 2 + 2, 32.5)
+        doc.text('Section:', pageWidth / 2 + 2, 32.5) // ✅ Was "Section / Adviser:"
 
         doc.setFont('helvetica', 'normal')
         doc.text(process.env.NEXT_PUBLIC_SCHOOL_NAME || 'Saint Anne Academy', marginX + 32, 26)
         doc.text(getSchoolYearLabel(dateRange.start) || '________________', pageWidth / 2 + 32, 26)
         doc.text(`Grade ${group.grade}`, marginX + 32, 32.5)
-        doc.text(`${group.section} / ${group.adviser}`, pageWidth / 2 + 42, 32.5, {
+        doc.text(`${group.section}`, pageWidth / 2 + 42, 32.5, { // ✅ Was `${group.section} / ${group.adviser}`
           maxWidth: (pageWidth / 2) - 45
         })
 
@@ -811,7 +798,7 @@ export default function SuperAdminReportsPage() {
         doc.text('2. Use the final daily status for the day.', marginX + 2, footerTop + 32, { maxWidth: (pageWidth / 2) - 12 })
 
         doc.setFont('helvetica', 'bold')
-        doc.text('Certified true and correct by the adviser:', pageWidth - marginX - 2, footerTop + 6, { align: 'right' })
+        doc.text('Certified true and correct:', pageWidth - marginX - 2, footerTop + 6, { align: 'right' })
         doc.setFont('helvetica', 'normal')
         doc.line(pageWidth - 90, footerTop + 18, pageWidth - 10, footerTop + 18)
         doc.text('Signature over Printed Name', pageWidth - 50, footerTop + 22, { align: 'center' })
@@ -835,7 +822,6 @@ export default function SuperAdminReportsPage() {
       setExporting(true)
       const workbook = XLSX.utils.book_new()
       
-      // Summary Sheet
       const summarySheet = XLSX.utils.json_to_sheet([{
         'Report Period': `${dateRange.start} to ${dateRange.end}`,
         'Generated On': new Date().toLocaleString(),
@@ -849,7 +835,6 @@ export default function SuperAdminReportsPage() {
       }])
       XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary')
       
-      // Teacher Performance Sheet
       const teacherSheet = XLSX.utils.json_to_sheet(teacherPerformance.map(t => ({
         'Teacher': t.teacher_name,
         'Total Sessions': t.total_sessions,
@@ -860,7 +845,6 @@ export default function SuperAdminReportsPage() {
       })))
       XLSX.utils.book_append_sheet(workbook, teacherSheet, 'Teacher Performance')
       
-      // At-Risk Students Sheet
       const riskSheet = XLSX.utils.json_to_sheet(atRiskStudents.map(s => ({
         'Student Name': s.student_name,
         'LRN': s.lrn,
@@ -873,7 +857,6 @@ export default function SuperAdminReportsPage() {
       })))
       XLSX.utils.book_append_sheet(workbook, riskSheet, 'At-Risk Students')
       
-      // Daily Trend Sheet
       const trendSheet = XLSX.utils.json_to_sheet(dailyTrend.map(d => ({
         'Date': d.date,
         'Present': d.present,
@@ -1080,7 +1063,6 @@ export default function SuperAdminReportsPage() {
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Attendance Trend */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center gap-3 mb-4">
             <LineChart className="w-5 h-5 text-blue-600" />
@@ -1102,7 +1084,6 @@ export default function SuperAdminReportsPage() {
           </div>
         </div>
 
-        {/* Status Distribution */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center gap-3 mb-4">
             <PieChartIcon className="w-5 h-5 text-purple-600" />
@@ -1137,7 +1118,6 @@ export default function SuperAdminReportsPage() {
         </div>
       </div>
 
-      {/* Grade Breakdown */}
       {gradeChartData.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center gap-3 mb-4">
@@ -1158,7 +1138,6 @@ export default function SuperAdminReportsPage() {
         </div>
       )}
 
-      {/* Teacher Performance Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="p-5 border-b border-gray-200">
           <div className="flex items-center gap-3">
@@ -1218,7 +1197,6 @@ export default function SuperAdminReportsPage() {
         </div>
       </div>
 
-      {/* At-Risk Students */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="p-5 border-b border-gray-200">
           <div className="flex items-center gap-3">
@@ -1279,7 +1257,6 @@ export default function SuperAdminReportsPage() {
               </table>
             </div>
 
-            {/* Pagination */}
             {totalPages > 1 && (
               <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
                 <p className="text-sm text-gray-600">
